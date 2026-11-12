@@ -147,6 +147,42 @@ def init_db():
     )
     """)
 
+    # 8. Feature 9: Chronological Audit Timeline Events
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS audit_timeline_events (
+        timeline_id TEXT PRIMARY KEY,
+        audit_id TEXT NOT NULL,
+        step_number INTEGER NOT NULL,
+        stage_name TEXT NOT NULL,
+        event_title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL, -- 'completed', 'in_progress', 'paused', 'failed'
+        timestamp TEXT NOT NULL,
+        reviewer_info TEXT,
+        FOREIGN KEY (audit_id) REFERENCES audit_runs(audit_id)
+    )
+    """)
+
+    # 9. Feature 11: Tamper-Evident SHA-256 Hash-Linked Audit Event Chain
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS audit_event_chain (
+        event_id TEXT PRIMARY KEY,
+        audit_id TEXT NOT NULL,
+        event_index INTEGER NOT NULL,
+        prev_hash TEXT NOT NULL,
+        curr_hash TEXT NOT NULL,
+        event_type TEXT NOT NULL, -- 'INITIATED', 'FLAGGED_ANOMALY', 'HUMAN_DECISION', 'WORKFLOW_RESUMED', 'VERIFIED_REPORT'
+        original_value REAL,
+        corrected_value REAL,
+        decision TEXT,
+        reason TEXT,
+        reviewer TEXT,
+        timestamp TEXT NOT NULL,
+        data_payload TEXT,
+        FOREIGN KEY (audit_id) REFERENCES audit_runs(audit_id)
+    )
+    """)
+
     conn.commit()
     conn.close()
 

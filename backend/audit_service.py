@@ -289,6 +289,34 @@ def start_audit_run(ticker: str, period: str = "FY2023") -> Dict[str, Any]:
     conn.commit()
     conn.close()
 
+    # Feature 11: Tamper-Evident Hash Chain event
+    try:
+        from backend.advanced_features import record_hash_linked_audit_event
+        record_hash_linked_audit_event(
+            audit_id=audit_id,
+            event_type="INITIATED",
+            reason=f"Audit initiated for {ticker} ({period})",
+            reviewer="Autonomous Agent",
+            data_payload={"ticker": ticker, "period": period}
+        )
+        if len(escalated_items) > 0:
+            record_hash_linked_audit_event(
+                audit_id=audit_id,
+                event_type="FLAGGED_ANOMALY",
+                reason=f"{len(escalated_items)} metric(s) flagged for human review",
+                reviewer="LangGraph Guardrail",
+                data_payload={"flagged_count": len(escalated_items)}
+            )
+        elif new_status == "completed":
+            record_hash_linked_audit_event(
+                audit_id=audit_id,
+                event_type="VERIFIED_REPORT",
+                reason="Audit completed autonomously with 100% verification",
+                reviewer="Autonomous Engine"
+            )
+    except Exception as e:
+        print("Warning: hash chain recording failed:", e)
+
     return {
         "audit_id": audit_id,
         "ticker": ticker,
@@ -463,6 +491,35 @@ def process_review_decision(review_id: str, decision: str, corrected_value: Opti
 
     conn.commit()
     conn.close()
+
+    # Feature 11: Record hash-linked block
+    try:
+        from backend.advanced_features import record_hash_linked_audit_event
+        record_hash_linked_audit_event(
+            audit_id=audit_id,
+            event_type="HUMAN_DECISION",
+            original_value=original_val,
+            corrected_value=corrected_value if decision == "correct" else None,
+            decision=decision,
+            reason=reason or f"Human Reviewer decision: {decision.capitalize()}",
+            reviewer=comments or "Certified Auditor",
+            data_payload={"metric_id": metric_id, "metric_name": metric_name}
+        )
+        if pending_count == 0:
+            record_hash_linked_audit_event(
+                audit_id=audit_id,
+                event_type="WORKFLOW_RESUMED",
+                reason="All review items resolved. Workflow resumed to XBRL reconciliation.",
+                reviewer="LangGraph Controller"
+            )
+            record_hash_linked_audit_event(
+                audit_id=audit_id,
+                event_type="VERIFIED_REPORT",
+                reason="Final SEC XBRL accuracy certificate issued",
+                reviewer="System Engine"
+            )
+    except Exception as e:
+        print("Warning: hash event recording error:", e)
 
     return {
         "success": True,
