@@ -36,7 +36,17 @@ def seed_companies_if_empty():
                 datetime.now(timezone.utc).isoformat()
             ))
         conn.commit()
+
+    # Pre-seed initial demonstration audit for NVDA if audit_runs is empty
+    cursor.execute("SELECT COUNT(*) as acount FROM audit_runs")
+    acount = cursor.fetchone()["acount"]
     conn.close()
+
+    if acount == 0:
+        try:
+            start_audit_run("NVDA", "FY2023")
+        except Exception as e:
+            print("Warning: initial NVDA seed audit failed:", e)
 
 def get_all_companies():
     seed_companies_if_empty()
