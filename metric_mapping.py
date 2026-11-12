@@ -1,0 +1,202 @@
+"""
+metric_mapping.py - Metric definitions, XBRL tag mappings, and supported companies.
+
+FinAudit AI - Member 1: SEC EDGAR Integration & Financial Extraction
+"""
+
+from typing import Dict, List, Any
+from extraction_models import CompanyInfo
+
+# The 5 companies mandated by the problem statement
+SUPPORTED_COMPANIES: Dict[str, CompanyInfo] = {
+    "AAPL": CompanyInfo(name="Apple Inc.", ticker="AAPL", cik="0000320193"),
+    "MSFT": CompanyInfo(name="Microsoft Corporation", ticker="MSFT", cik="0000789019"),
+    "AMZN": CompanyInfo(name="Amazon.com, Inc.", ticker="AMZN", cik="0001018724"),
+    "GOOGL": CompanyInfo(name="Alphabet Inc.", ticker="GOOGL", cik="0001652044"),
+    "NVDA": CompanyInfo(name="NVIDIA Corporation", ticker="NVDA", cik="0001045810"),
+}
+
+# CIK lookup dictionary (both 10-digit padded and unpadded)
+CIK_TO_COMPANY: Dict[str, CompanyInfo] = {}
+for comp in SUPPORTED_COMPANIES.values():
+    CIK_TO_COMPANY[comp.cik] = comp
+    CIK_TO_COMPANY[str(int(comp.cik))] = comp
+    CIK_TO_COMPANY[comp.ticker] = comp
+
+# 8 Financial Metrics Definitions and Mappings
+METRIC_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+    "Revenue": {
+        "standard_name": "Revenue",
+        "statement_type": "income_statement",
+        "concept_type": "duration",
+        "description": "Total revenue or sales generated from core operations.",
+        "xbrl_tags": [
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "Revenues",
+            "SalesRevenueNet",
+            "SalesRevenueGoodsNet",
+            "RevenueFromContractWithCustomerIncludingAssessedTax",
+        ],
+        "statement_labels": [
+            "total net sales",
+            "net sales",
+            "total revenues",
+            "total revenue",
+            "revenues",
+            "revenue",
+            "sales",
+        ],
+    },
+    "Net Income": {
+        "standard_name": "Net Income",
+        "statement_type": "income_statement",
+        "concept_type": "duration",
+        "description": "Net profit or loss after taxes, interest, and all expenses.",
+        "xbrl_tags": [
+            "NetIncomeLoss",
+            "ProfitLoss",
+            "NetIncomeLossAvailableToCommonStockholdersBasic",
+        ],
+        "statement_labels": [
+            "net income",
+            "net earnings",
+            "net income (loss)",
+            "net income/loss",
+            "net income attributable to common shareholders",
+            "net income attributable to common stock",
+        ],
+    },
+    "Total Assets": {
+        "standard_name": "Total Assets",
+        "statement_type": "balance_sheet",
+        "concept_type": "instant",
+        "description": "Total economic resources owned or controlled by the company.",
+        "xbrl_tags": [
+            "Assets",
+        ],
+        "statement_labels": [
+            "total assets",
+            "assets",
+        ],
+    },
+    "Total Liabilities": {
+        "standard_name": "Total Liabilities",
+        "statement_type": "balance_sheet",
+        "concept_type": "instant",
+        "description": "Total financial obligations owed by the company to outside parties.",
+        "xbrl_tags": [
+            "Liabilities",
+            "LiabilitiesCurrentAndNoncurrent",
+        ],
+        "statement_labels": [
+            "total liabilities",
+            "liabilities",
+        ],
+        "notes": "Some companies (e.g. Amazon) do not tag a single combined 'Liabilities' XBRL concept. In such cases, the metric is reported as absent or can be calculated from Total Assets minus Stockholders' Equity without guessing.",
+    },
+    "Shareholders' Equity": {
+        "standard_name": "Shareholders' Equity",
+        "statement_type": "balance_sheet",
+        "concept_type": "instant",
+        "description": "Net worth of the company belonging to shareholders.",
+        "xbrl_tags": [
+            "StockholdersEquity",
+            "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "CommonStockholdersEquity",
+        ],
+        "statement_labels": [
+            "total stockholders' equity",
+            "total shareholders' equity",
+            "total equity",
+            "stockholders' equity",
+            "shareholders' equity",
+        ],
+    },
+    "Operating Cash Flow": {
+        "standard_name": "Operating Cash Flow",
+        "statement_type": "cash_flow_statement",
+        "concept_type": "duration",
+        "description": "Cash generated or consumed by normal business operating activities.",
+        "xbrl_tags": [
+            "NetCashProvidedByUsedInOperatingActivities",
+            "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
+        ],
+        "statement_labels": [
+            "net cash provided by operating activities",
+            "net cash provided by (used in) operating activities",
+            "cash provided by operating activities",
+            "cash generated by operating activities",
+            "operating activities",
+        ],
+    },
+    "Operating Income": {
+        "standard_name": "Operating Income",
+        "statement_type": "income_statement",
+        "concept_type": "duration",
+        "description": "Profit before interest and income tax expenses (operating profit).",
+        "xbrl_tags": [
+            "OperatingIncomeLoss",
+        ],
+        "statement_labels": [
+            "operating income",
+            "operating income (loss)",
+            "operating profit",
+            "income from operations",
+        ],
+    },
+    "Cash and Cash Equivalents": {
+        "standard_name": "Cash and Cash Equivalents",
+        "statement_type": "balance_sheet",
+        "concept_type": "instant",
+        "description": "Currency, bank accounts, and highly liquid short-term investments.",
+        "xbrl_tags": [
+            "CashAndCashEquivalentsAtCarryingValue",
+            "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+            "Cash",
+        ],
+        "statement_labels": [
+            "cash and cash equivalents",
+            "cash and cash equivalents at end of year",
+            "cash and cash equivalents at end of period",
+            "cash, cash equivalents and restricted cash",
+        ],
+    },
+}
+
+# List of metric names in the required order
+ORDERED_METRICS: List[str] = [
+    "Revenue",
+    "Net Income",
+    "Total Assets",
+    "Total Liabilities",
+    "Shareholders' Equity",
+    "Operating Cash Flow",
+    "Operating Income",
+    "Cash and Cash Equivalents",
+]
+
+
+def normalize_cik(cik: str) -> str:
+    """Normalize CIK to standard 10-digit zero-padded string."""
+    cleaned = "".join(filter(str.isdigit, str(cik)))
+    return cleaned.zfill(10)
+
+
+def get_company_by_identifier(identifier: str) -> CompanyInfo:
+    """Lookup company info by ticker, CIK, or name."""
+    cleaned = identifier.strip().upper()
+    if cleaned in SUPPORTED_COMPANIES:
+        return SUPPORTED_COMPANIES[cleaned]
+    
+    digits = "".join(filter(str.isdigit, identifier))
+    if digits:
+        padded = digits.zfill(10)
+        if padded in CIK_TO_COMPANY:
+            return CIK_TO_COMPANY[padded]
+    
+    for comp in SUPPORTED_COMPANIES.values():
+        if cleaned in comp.name.upper() or cleaned in comp.ticker.upper():
+            return comp
+            
+    raise ValueError(f"Company '{identifier}' not found in supported companies.")
+
