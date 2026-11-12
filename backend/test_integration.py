@@ -103,6 +103,92 @@ class TestFinAuditIntegration(unittest.TestCase):
         self.assertGreaterEqual(k["total_metrics_extracted"], 10)
         print(f"[PASS] 8. Dashboard KPIs telemetry verified: {k}")
 
+    def test_05_advanced_12_features(self):
+        from backend.advanced_features import (
+            get_audit_anomalies_and_explanations,
+            get_smart_evidence_viewer,
+            process_copilot_chat,
+            calculate_audit_risk_score,
+            get_multi_company_benchmarking,
+            get_company_historical_intelligence,
+            get_accounting_reconciliation_workspace,
+            generate_audit_report_payload,
+            generate_audit_report_html,
+            get_audit_timeline,
+            get_reviewer_feedback_analytics,
+            verify_audit_trail_integrity,
+            get_live_audit_monitoring
+        )
+
+        # 1. Start a fresh audit to test
+        run = start_audit_run("AAPL", "FY2023")
+        audit_id = run["audit_id"]
+
+        # Feature 1: Anomaly explanations
+        anoms = get_audit_anomalies_and_explanations(audit_id)
+        self.assertIn("anomalies", anoms)
+        print("[PASS] Feature 1: AI Anomaly Explanation Engine working.")
+
+        # Feature 2: Smart Evidence viewer
+        evid = get_smart_evidence_viewer(audit_id)
+        self.assertGreaterEqual(evid["evidence_count"], 5)
+        print("[PASS] Feature 2: Smart Evidence Highlighting viewer working.")
+
+        # Feature 3: AI Financial Audit Copilot
+        copilot_res = process_copilot_chat("Why was NVIDIA flagged?", audit_id=audit_id)
+        self.assertIn("answer", copilot_res)
+        self.assertIn("NVIDIA", copilot_res["answer"])
+        print("[PASS] Feature 3: AI Financial Audit Copilot working.")
+
+        # Feature 4: Explainable Financial Risk Score
+        risk_res = calculate_audit_risk_score(audit_id)
+        self.assertIn("risk_score", risk_res)
+        self.assertIn(risk_res["classification"], ["LOW RISK", "MEDIUM RISK", "HIGH RISK"])
+        print(f"[PASS] Feature 4: Financial Risk Score working ({risk_res['classification']}).")
+
+        # Feature 5: Multi-Company Benchmarking
+        bench_res = get_multi_company_benchmarking("FY2023")
+        self.assertEqual(len(bench_res["companies"]), 5)
+        print("[PASS] Feature 5: Multi-Company Benchmarking working (5 companies ranked).")
+
+        # Feature 6: Historical Financial Intelligence
+        hist_res = get_company_historical_intelligence("AAPL")
+        self.assertIn("multi_year_series", hist_res)
+        print("[PASS] Feature 6: Historical Financial Intelligence working.")
+
+        # Feature 7: Smart Accounting Reconciliation
+        recon_res = get_accounting_reconciliation_workspace(audit_id)
+        self.assertIn("balance_sheet_reconciliation", recon_res)
+        self.assertEqual(recon_res["balance_sheet_reconciliation"]["status"], "PASSED")
+        print("[PASS] Feature 7: Smart Accounting Reconciliation working.")
+
+        # Feature 8: Professional Audit Report Generator
+        rep_html = generate_audit_report_html(audit_id)
+        self.assertIn("FINFORGE", rep_html)
+        self.assertIn("Audit Certificate", rep_html)
+        print("[PASS] Feature 8: Professional Audit Report & Certificate generated.")
+
+        # Feature 9: Chronological Audit Decision Timeline
+        timeline_res = get_audit_timeline(audit_id)
+        self.assertGreaterEqual(len(timeline_res["timeline"]), 4)
+        print("[PASS] Feature 9: Chronological Audit Timeline working.")
+
+        # Feature 10: Reviewer Feedback Intelligence
+        feedback_res = get_reviewer_feedback_analytics()
+        self.assertIn("decisions_breakdown", feedback_res)
+        print("[PASS] Feature 10: Reviewer Feedback Intelligence working.")
+
+        # Feature 11: Tamper-Evident SHA-256 Hash-Linked Audit Trail
+        integrity_res = verify_audit_trail_integrity(audit_id)
+        self.assertTrue(integrity_res["is_valid"])
+        print(f"[PASS] Feature 11: Tamper-Evident Hash Chain verified ({integrity_res['status']}).")
+
+        # Feature 12: Live 9-Stage Audit Monitoring
+        mon_res = get_live_audit_monitoring()
+        self.assertGreaterEqual(len(mon_res["monitored_audits"]), 1)
+        self.assertEqual(len(mon_res["workflow_stages"]), 9)
+        print("[PASS] Feature 12: Live 9-Stage Audit Monitoring working.")
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -39,6 +39,21 @@ from backend.audit_service import (
 )
 from backend.workflow_engine import AuditWorkflowGraph
 from backend.advanced_analytics import compute_yoy_variance_analysis, get_adaptive_thresholds, MCP_TOOLS_MANIFEST
+from backend.advanced_features import (
+    get_audit_anomalies_and_explanations,
+    get_smart_evidence_viewer,
+    process_copilot_chat,
+    calculate_audit_risk_score,
+    get_multi_company_benchmarking,
+    get_company_historical_intelligence,
+    get_accounting_reconciliation_workspace,
+    generate_audit_report_payload,
+    generate_audit_report_html,
+    get_audit_timeline,
+    get_reviewer_feedback_analytics,
+    verify_audit_trail_integrity,
+    get_live_audit_monitoring
+)
 
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 if not os.path.exists(FRONTEND_DIR):
@@ -162,6 +177,85 @@ class FinAuditRequestHandler(BaseHTTPRequestHandler):
                 return self.send_json(audit)
             return self.send_error_json("Audit run not found", status=404)
 
+        # Feature 5: GET /api/benchmark
+        if path == "/api/benchmark":
+            period = query.get("period", ["FY2023"])[0]
+            benchmark_data = get_multi_company_benchmarking(period)
+            return self.send_json(benchmark_data)
+
+        # Feature 6: GET /api/company/{ticker}/historical
+        hist_match = re.match(r"^/api/company/([^/]+)/historical$", path)
+        if hist_match:
+            ticker = hist_match.group(1)
+            hist_data = get_company_historical_intelligence(ticker)
+            return self.send_json(hist_data)
+
+        # Feature 10: GET /api/reviewer/feedback
+        if path == "/api/reviewer/feedback":
+            fb_data = get_reviewer_feedback_analytics()
+            return self.send_json(fb_data)
+
+        # Feature 12: GET /api/audits/monitor
+        if path == "/api/audits/monitor":
+            monitor_data = get_live_audit_monitoring()
+            return self.send_json(monitor_data)
+
+        # Feature 1: GET /api/audit/{id}/anomalies or /explanations
+        anom_match = re.match(r"^/api/audit/([^/]+)/(?:anomalies|explanations)$", path)
+        if anom_match:
+            audit_id = anom_match.group(1)
+            anom_data = get_audit_anomalies_and_explanations(audit_id)
+            return self.send_json(anom_data)
+
+        # Feature 2: GET /api/audit/{id}/evidence
+        evid_match = re.match(r"^/api/audit/([^/]+)/evidence$", path)
+        if evid_match:
+            audit_id = evid_match.group(1)
+            metric_id = query.get("metric_id", [None])[0]
+            evid_data = get_smart_evidence_viewer(audit_id, metric_id)
+            return self.send_json(evid_data)
+
+        # Feature 4: GET /api/audit/{id}/risk
+        risk_match = re.match(r"^/api/audit/([^/]+)/risk$", path)
+        if risk_match:
+            audit_id = risk_match.group(1)
+            risk_data = calculate_audit_risk_score(audit_id)
+            return self.send_json(risk_data)
+
+        # Feature 7: GET /api/audit/{id}/reconciliation
+        recon_match = re.match(r"^/api/audit/([^/]+)/reconciliation$", path)
+        if recon_match:
+            audit_id = recon_match.group(1)
+            recon_data = get_accounting_reconciliation_workspace(audit_id)
+            return self.send_json(recon_data)
+
+        # Feature 8: GET /api/audit/{id}/report/pdf or /html
+        cert_match = re.match(r"^/api/audit/([^/]+)/report/(?:pdf|html)$", path)
+        if cert_match:
+            audit_id = cert_match.group(1)
+            html_content = generate_audit_report_html(audit_id)
+            body = html_content.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # Feature 9: GET /api/audit/{id}/timeline
+        timeline_match = re.match(r"^/api/audit/([^/]+)/timeline$", path)
+        if timeline_match:
+            audit_id = timeline_match.group(1)
+            timeline_data = get_audit_timeline(audit_id)
+            return self.send_json(timeline_data)
+
+        # Feature 11: GET /api/audit/{id}/integrity
+        integrity_match = re.match(r"^/api/audit/([^/]+)/integrity$", path)
+        if integrity_match:
+            audit_id = integrity_match.group(1)
+            integrity_data = verify_audit_trail_integrity(audit_id)
+            return self.send_json(integrity_data)
+
         # Serve static UI files
         self.serve_frontend(path)
 
@@ -197,6 +291,19 @@ class FinAuditRequestHandler(BaseHTTPRequestHandler):
                 return self.send_json(result)
             except ValueError as ve:
                 return self.send_error_json(str(ve), status=400)
+            except Exception as e:
+                return self.send_error_json(str(e), status=500)
+
+        # Feature 3: POST /api/copilot/chat
+        if path == "/api/copilot/chat":
+            query_text = body.get("query", "")
+            audit_id = body.get("audit_id")
+            session_history = body.get("session_history", [])
+            if not query_text:
+                return self.send_error_json("Query is required", status=400)
+            try:
+                copilot_resp = process_copilot_chat(query_text, audit_id, session_history)
+                return self.send_json(copilot_resp)
             except Exception as e:
                 return self.send_error_json(str(e), status=500)
 
