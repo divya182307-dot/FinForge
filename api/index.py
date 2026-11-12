@@ -30,6 +30,7 @@ from backend.audit_service import (
     get_accuracy_report,
     get_dashboard_summary,
     seed_companies_if_empty,
+    reset_database_and_audits,
 )
 from backend.init_db import seed_demo_environment
 from backend.workflow_engine import AuditWorkflowGraph
@@ -182,6 +183,8 @@ class ReviewDecisionRequest(BaseModel):
     corrected_value: Optional[float] = None
     reason: Optional[str] = ""
     comments: Optional[str] = ""
+    audit_id: Optional[str] = None
+    metric_name: Optional[str] = None
 
 class CopilotChatRequest(BaseModel):
     query: str
@@ -196,6 +199,12 @@ class CopilotChatRequest(BaseModel):
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "service": "FinForge AI", "deployment": "Vercel Serverless"}
+
+@app.post("/api/audit/reset")
+def api_reset_audits():
+    """Wipe all audit runs and reviews for a clean demonstration run."""
+    ensure_database_ready()
+    return reset_database_and_audits()
 
 @app.get("/api/companies")
 def api_get_companies():
@@ -268,11 +277,44 @@ def api_submit_review_decision(review_id: str, req: ReviewDecisionRequest):
             req.corrected_value,
             req.reason,
             req.comments,
+            audit_id=req.audit_id,
+            metric_name=req.metric_name,
         )
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/reviews/{review_id}/approve")
+def api_quick_approve(review_id: str, req: Optional[ReviewDecisionRequest] = None):
+    """Quick 1-click approval helper endpoint."""
+    ensure_database_ready()
+    reason = req.reason if req and req.reason else "Auditor approved extracted metric based on 10-K disclosures"
+    comments = req.comments if req else ""
+    audit_id = req.audit_id if req else None
+    metric_name = req.metric_name if req else None
+    return process_review_decision(review_id, "approve", None, reason, comments, audit_id=audit_id, metric_name=metric_name)
+
+@app.post("/api/reviews/{review_id}/reject")
+def api_quick_reject(review_id: str, req: Optional[ReviewDecisionRequest] = None):
+    """Quick 1-click rejection helper endpoint."""
+    ensure_database_ready()
+    reason = req.reason if req and req.reason else "Auditor rejected metric due to balance sheet invariant failure"
+    comments = req.comments if req else ""
+    audit_id = req.audit_id if req else None
+    metric_name = req.metric_name if req else None
+    return process_review_decision(review_id, "reject", None, reason, comments, audit_id=audit_id, metric_name=metric_name)
+
+@app.post("/api/reviews/{review_id}/correct")
+def api_quick_correct(review_id: str, req: Optional[ReviewDecisionRequest] = None):
+    """Quick 1-click correction helper endpoint."""
+    ensure_database_ready()
+    corrected_val = req.corrected_value if req else None
+    reason = req.reason if req and req.reason else "Corrected to match SEC EDGAR XBRL Item 8 accounting invariants"
+    comments = req.comments if req else ""
+    audit_id = req.audit_id if req else None
+    metric_name = req.metric_name if req else None
+    return process_review_decision(review_id, "correct", corrected_val, reason, comments, audit_id=audit_id, metric_name=metric_name)
 
 @app.get("/api/audit/{audit_id}/report")
 def api_get_audit_report(audit_id: str):

@@ -35,7 +35,8 @@ from backend.audit_service import (
     process_review_decision,
     get_audit_history,
     get_accuracy_report,
-    get_dashboard_summary
+    get_dashboard_summary,
+    reset_database_and_audits,
 )
 from backend.workflow_engine import AuditWorkflowGraph
 from backend.advanced_analytics import compute_yoy_variance_analysis, get_adaptive_thresholds, MCP_TOOLS_MANIFEST
@@ -264,6 +265,14 @@ class FinAuditRequestHandler(BaseHTTPRequestHandler):
         path = parsed_url.path
         body = self.get_parsed_body()
 
+        # 0. POST /api/audit/reset
+        if path == "/api/audit/reset":
+            try:
+                res = reset_database_and_audits()
+                return self.send_json(res)
+            except Exception as e:
+                return self.send_error_json(str(e), status=500)
+
         # 1. POST /api/audit/run
         if path == "/api/audit/run":
             ticker = body.get("ticker")
@@ -284,13 +293,37 @@ class FinAuditRequestHandler(BaseHTTPRequestHandler):
             corrected_value = body.get("corrected_value")
             reason = body.get("reason", "")
             comments = body.get("comments", "")
+            audit_id = body.get("audit_id")
+            metric_name = body.get("metric_name")
             if not decision:
                 return self.send_error_json("Decision ('approve', 'correct', 'reject') is required", status=400)
             try:
-                result = process_review_decision(review_id, decision, corrected_value, reason, comments)
+                result = process_review_decision(
+                    review_id, decision, corrected_value, reason, comments,
+                    audit_id=audit_id, metric_name=metric_name
+                )
                 return self.send_json(result)
             except ValueError as ve:
                 return self.send_error_json(str(ve), status=400)
+            except Exception as e:
+                return self.send_error_json(str(e), status=500)
+
+        # 2b. Quick actions: POST /api/reviews/{id}/(approve|correct|reject)
+        quick_match = re.match(r"^/api/reviews/([^/]+)/(approve|correct|reject)$", path)
+        if quick_match:
+            review_id = quick_match.group(1)
+            decision = quick_match.group(2)
+            corrected_value = body.get("corrected_value")
+            reason = body.get("reason", "")
+            comments = body.get("comments", "")
+            audit_id = body.get("audit_id")
+            metric_name = body.get("metric_name")
+            try:
+                result = process_review_decision(
+                    review_id, decision, corrected_value, reason, comments,
+                    audit_id=audit_id, metric_name=metric_name
+                )
+                return self.send_json(result)
             except Exception as e:
                 return self.send_error_json(str(e), status=500)
 

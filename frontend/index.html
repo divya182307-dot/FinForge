@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -39,7 +40,9 @@
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
   <!-- React & ReactDOM CDN -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -52,40 +55,49 @@
       color: #e2e8f0;
       overflow-x: hidden;
     }
+
     .font-mono {
       font-family: 'JetBrains Mono', monospace;
     }
+
     /* Sleek card glow effects matching screenshot */
     .glow-card {
       background: linear-gradient(180deg, rgba(16, 24, 43, 0.85) 0%, rgba(12, 18, 32, 0.95) 100%);
       border: 1px solid #1a2642;
       box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
     }
+
     .glow-card:hover {
       border-color: rgba(6, 182, 212, 0.35);
     }
+
     .active-nav-pill {
       background: linear-gradient(90deg, rgba(6, 182, 212, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
       border: 1px solid rgba(6, 182, 212, 0.4);
       color: #38bdf8;
       box-shadow: 0 0 15px -3px rgba(6, 182, 212, 0.25);
     }
+
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
+
     ::-webkit-scrollbar-track {
       background: #070b14;
     }
+
     ::-webkit-scrollbar-thumb {
       background: #1a2642;
       border-radius: 3px;
     }
+
     ::-webkit-scrollbar-thumb:hover {
       background: #223254;
     }
   </style>
 </head>
+
 <body class="bg-brandDark-950 text-slate-100 antialiased min-h-screen">
   <div id="root"></div>
 
@@ -97,9 +109,8 @@
       if (!notification) return null;
       const isError = notification.type === 'error';
       return (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md transition-all ${
-          isError ? 'bg-rose-950/90 border-rose-500/50 text-rose-200' : 'bg-brandDark-900/95 border-emerald-500/50 text-emerald-300'
-        }`}>
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md transition-all ${isError ? 'bg-rose-950/90 border-rose-500/50 text-rose-200' : 'bg-brandDark-900/95 border-emerald-500/50 text-emerald-300'
+          }`}>
           <div className="mr-3 font-semibold text-lg">{isError ? '✕' : '✓'}</div>
           <div className="text-sm font-medium">{notification.message}</div>
           <button onClick={onClose} className="ml-4 text-slate-400 hover:text-white">✕</button>
@@ -490,6 +501,32 @@
         }
       }, [selectedAuditId]);
 
+      const handleResetAudits = async () => {
+        if (!window.confirm("Are you sure you want to delete all audit requests and review records?\n\nThis will clear the database so you can submit a clean new audit test.")) {
+          return;
+        }
+        setLoading(true);
+        try {
+          const res = await fetch('/api/audit/reset', { method: 'POST' });
+          const result = await res.json();
+          if (res.ok) {
+            showToast("All audits and reviews cleared! Database reset & ready for fresh run.");
+            setSelectedAuditId(null);
+            setAuditDetails(null);
+            setRiskData(null);
+            setActiveReviewItem(null);
+            setReviewAction(null);
+            await loadData();
+          } else {
+            showToast(result.detail || result.error || "Reset failed", "error");
+          }
+        } catch (err) {
+          showToast(err.message, "error");
+        } finally {
+          setLoading(false);
+        }
+      };
+
       const handleStartAudit = async () => {
         setLoading(true);
         try {
@@ -505,7 +542,7 @@
             await loadData();
             setSelectedAuditId(result.audit_id);
           } else {
-            showToast(result.error || 'Audit initiation failed', 'error');
+            showToast(result.detail || result.error || 'Audit initiation failed', 'error');
           }
         } catch (err) {
           showToast(err.message, 'error');
@@ -514,44 +551,90 @@
         }
       };
 
-      const handleReviewDecision = async () => {
-        if (!activeReviewItem || !reviewAction) return;
+      const openReviewModal = (item, action) => {
+        setActiveReviewItem(item);
+        setReviewAction(action);
+        const expVal = (item.expected_value !== null && item.expected_value !== undefined)
+          ? Number(item.expected_value)
+          : (item.metric_name === 'Total Assets' ? 41182.0 : (item.metric_name === 'Net Income' ? 29760.0 : item.original_value));
+        setCorrectionVal(expVal);
+        if (action === 'correct') {
+          setActionReason(`Reconciled with SEC Form 10-K Item 8 Balance Sheet: Total Assets = Total Liabilities + Stockholders' Equity ($${Number(expVal).toLocaleString()}M)`);
+        } else if (action === 'approve') {
+          setActionReason("Auditor approved extracted metric based on Form 10-K footnote disclosures and disclosures");
+        } else if (action === 'reject') {
+          setActionReason("Auditor rejected extracted metric due to accounting equation violation");
+        }
+      };
+
+      const handleReviewDecision = async (overrideAction = null, overrideItem = null, overrideVal = null) => {
+        const item = overrideItem || activeReviewItem;
+        const action = overrideAction || reviewAction;
+        if (!item || !action) return;
         setLoading(true);
 
+        const expVal = (item.expected_value !== null && item.expected_value !== undefined)
+          ? Number(item.expected_value)
+          : (item.metric_name === 'Total Assets' ? 41182.0 : (item.metric_name === 'Net Income' ? 29760.0 : item.original_value));
+
+        let correctedValue = null;
+        if (action === 'correct') {
+          if (overrideVal !== null && overrideVal !== undefined) {
+            correctedValue = parseFloat(overrideVal);
+          } else if (correctionVal !== '') {
+            correctedValue = parseFloat(correctionVal);
+          } else {
+            correctedValue = expVal;
+          }
+        }
+
+        let defaultReason = `Auditor ${action} action confirmed`;
+        if (action === 'correct') {
+          defaultReason = `Reconciled with SEC Form 10-K Item 8 Balance Sheet: Total Assets = Total Liabilities + Stockholders' Equity ($${Number(correctedValue).toLocaleString()}M)`;
+        } else if (action === 'approve') {
+          defaultReason = `Auditor approved extracted metric based on Form 10-K footnote disclosures`;
+        } else if (action === 'reject') {
+          defaultReason = `Auditor rejected extracted metric due to balance sheet equation violation`;
+        }
+
         const payload = {
-          decision: reviewAction,
-          corrected_value: reviewAction === 'correct' ? parseFloat(correctionVal) : null,
-          reason: actionReason || `Reviewer ${reviewAction} action confirmed`,
-          comments: actionComments
+          decision: action,
+          corrected_value: correctedValue,
+          reason: actionReason || defaultReason,
+          comments: actionComments || 'Certified Auditor decision confirmed',
+          audit_id: item.audit_id,
+          metric_name: item.metric_name
         };
 
-        if (reviewAction === 'correct' && (isNaN(payload.corrected_value) || payload.corrected_value <= 0)) {
+        if (action === 'correct' && (isNaN(payload.corrected_value) || payload.corrected_value <= 0)) {
           showToast("Please enter a valid numeric value", "error");
           setLoading(false);
           return;
         }
 
         try {
-          const res = await fetch(`/api/reviews/${activeReviewItem.review_id}/decision`, {
+          const res = await fetch(`/api/reviews/${item.review_id}/decision`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
-          const result = await res.json();
+          const result = await res.json().catch(() => ({}));
           if (res.ok) {
-            showToast(`Success! Decision '${reviewAction.toUpperCase()}' processed. LangGraph resumed: ${result.workflow_status}`);
+            showToast(`Success! Decision '${action.toUpperCase()}' processed. LangGraph resumed: ${result.workflow_status || 'completed'}`);
             setActiveReviewItem(null);
             setReviewAction(null);
             setCorrectionVal('');
             setActionReason('');
             setActionComments('');
             await loadData();
-            if (selectedAuditId) {
-              const freshDetails = await fetch(`/api/audit/${selectedAuditId}`).then(r => r.json());
+            const targetAid = item.audit_id || selectedAuditId;
+            if (targetAid) {
+              const freshDetails = await fetch(`/api/audit/${targetAid}`).then(r => r.json());
               setAuditDetails(freshDetails);
+              setSelectedAuditId(targetAid);
             }
           } else {
-            showToast(result.error || 'Review decision failed', 'error');
+            showToast(result.detail || result.error || result.message || 'Review decision failed', 'error');
           }
         } catch (err) {
           showToast(err.message, 'error');
@@ -601,11 +684,10 @@
                   <button
                     key={item.id}
                     onClick={() => setActiveNav(item.id)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                      activeNav === item.id
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${activeNav === item.id
                         ? 'active-nav-pill font-semibold'
                         : 'text-slate-400 hover:text-slate-100 hover:bg-brandDark-900/60'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center space-x-3">
                       <span className="text-sm">{item.icon}</span>
@@ -678,11 +760,10 @@
                   <span>Certificate</span>
                 </button>
                 {riskData && (
-                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold border flex items-center space-x-1 ${
-                    riskData.classification === 'LOW RISK' ? 'bg-emerald-500/10 text-accentEmerald border-emerald-500/30' :
-                    riskData.classification === 'MEDIUM RISK' ? 'bg-amber-500/10 text-accentAmber border-amber-500/30' :
-                    'bg-rose-500/10 text-accentRose border-rose-500/30'
-                  }`}>
+                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold border flex items-center space-x-1 ${riskData.classification === 'LOW RISK' ? 'bg-emerald-500/10 text-accentEmerald border-emerald-500/30' :
+                      riskData.classification === 'MEDIUM RISK' ? 'bg-amber-500/10 text-accentAmber border-amber-500/30' :
+                        'bg-rose-500/10 text-accentRose border-rose-500/30'
+                    }`}>
                     <span>🛡️</span>
                     <span>{riskData.classification} ({riskData.risk_score}/100)</span>
                   </span>
@@ -703,57 +784,57 @@
               </div>
             </header>
 
-                      {/* AUDIT CERTIFICATE & REPORT MODAL (INLINE PDF VIEWER) */}
-          {isReportModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-              <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden">
-                <div className="px-6 py-4 border-b border-brandDark-border bg-brandDark-950 flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <span className="text-xl">📜</span>
-                    <div>
-                      <h3 className="text-base font-bold text-white">Official Certified Audit Report</h3>
-                      <span className="text-xs font-mono text-slate-400">
-                        {auditDetails?.ticker || 'Target'} ({auditDetails?.period || 'FY2023'}) · Audit ID: {selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '')}
-                      </span>
+            {/* AUDIT CERTIFICATE & REPORT MODAL (INLINE PDF VIEWER) */}
+            {isReportModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+                <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden">
+                  <div className="px-6 py-4 border-b border-brandDark-border bg-brandDark-950 flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="text-xl">📜</span>
+                      <div>
+                        <h3 className="text-base font-bold text-white">Official Certified Audit Report</h3>
+                        <span className="text-xs font-mono text-slate-400">
+                          {auditDetails?.ticker || 'Target'} ({auditDetails?.period || 'FY2023'}) · Audit ID: {selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => handleDownloadPdfReport(selectedAuditId)}
+                        className="px-3.5 py-1.5 rounded-xl bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 text-xs font-bold font-mono flex items-center space-x-1.5 shadow transition"
+                      >
+                        <span>📥</span>
+                        <span>Download PDF</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const targetId = selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '');
+                          window.open(`/api/audit/${targetId}/report/html`, '_blank');
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-brandDark-800 hover:bg-brandDark-700 text-xs text-accentCyan border border-accentCyan/30 font-mono transition"
+                      >
+                        <span>🔗</span>
+                        <span>Open in New Tab</span>
+                      </button>
+                      <button
+                        onClick={() => setIsReportModalOpen(false)}
+                        className="px-3 py-1.5 rounded-xl bg-brandDark-800 text-xs text-slate-400 hover:text-white transition"
+                      >
+                        ✕ Close
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => handleDownloadPdfReport(selectedAuditId)}
-                      className="px-3.5 py-1.5 rounded-xl bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 text-xs font-bold font-mono flex items-center space-x-1.5 shadow transition"
-                    >
-                      <span>📥</span>
-                      <span>Download PDF</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        const targetId = selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '');
-                        window.open(`/api/audit/${targetId}/report/html`, '_blank');
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-brandDark-800 hover:bg-brandDark-700 text-xs text-accentCyan border border-accentCyan/30 font-mono transition"
-                    >
-                      <span>🔗</span>
-                      <span>Open in New Tab</span>
-                    </button>
-                    <button
-                      onClick={() => setIsReportModalOpen(false)}
-                      className="px-3 py-1.5 rounded-xl bg-brandDark-800 text-xs text-slate-400 hover:text-white transition"
-                    >
-                      ✕ Close
-                    </button>
+
+                  <div className="flex-1 bg-[#070b14] overflow-hidden p-2">
+                    <iframe
+                      src={`/api/audit/${selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '')}/report/html`}
+                      className="w-full h-full rounded-xl border border-brandDark-border"
+                      title="Audit Certificate Viewer"
+                    />
                   </div>
                 </div>
-
-                <div className="flex-1 bg-[#070b14] overflow-hidden p-2">
-                  <iframe
-                    src={`/api/audit/${selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '')}/report/html`}
-                    className="w-full h-full rounded-xl border border-brandDark-border"
-                    title="Audit Certificate Viewer"
-                  />
-                </div>
               </div>
-            </div>
-          )}
+            )}
 
             {/* SCROLLABLE MAIN VIEW AREA */}
             <main className="flex-1 overflow-y-auto p-8 space-y-6">
@@ -777,6 +858,14 @@
                     <span>Sample Data · For Demonstration Only</span>
                   </span>
                   <button
+                    onClick={handleResetAudits}
+                    className="px-3 py-2 rounded-xl bg-rose-500/15 border border-rose-500/40 hover:bg-rose-500 hover:text-white text-rose-300 text-xs font-bold flex items-center space-x-1.5 transition shadow"
+                    title="Clear all previous audits and reviews to test a fresh run"
+                  >
+                    <span>🗑️</span>
+                    <span>Clear / Reset Audits</span>
+                  </button>
+                  <button
                     onClick={() => { setAuditModalTab('upload'); if (!uploadRawJson) loadTeslaAnomalySample(); setIsStartAuditOpen(true); }}
                     className="px-3.5 py-2 rounded-xl bg-accentCyan/15 border border-accentCyan/40 hover:bg-accentCyan hover:text-brandDark-950 text-accentCyan text-xs font-bold flex items-center space-x-1.5 transition shadow"
                   >
@@ -799,11 +888,8 @@
                   summary={summary}
                   audits={audits}
                   pendingReviews={pendingReviews}
-                  onOpenReviewItem={(item, action) => {
-                    setActiveReviewItem(item);
-                    setReviewAction(action);
-                    setCorrectionVal(action === 'correct' ? (item.expected_value ?? item.original_value) : '');
-                  }}
+                  onOpenReviewItem={openReviewModal}
+                  onQuickAction={(item, action, val) => handleReviewDecision(action, item, val)}
                   onNavigateReview={() => setActiveNav('review')}
                 />
               )}
@@ -841,11 +927,9 @@
               {activeNav === 'review' && (
                 <HumanReviewQueueView
                   pendingReviews={pendingReviews}
-                  onAction={(item, action) => {
-                    setActiveReviewItem(item);
-                    setReviewAction(action);
-                    setCorrectionVal(action === 'correct' ? (item.expected_value ?? item.original_value) : '');
-                  }}
+                  onAction={openReviewModal}
+                  onQuickAction={(item, action, val) => handleReviewDecision(action, item, val)}
+                  onResetAudits={handleResetAudits}
                   onInspectEvidence={(item) => setEvidenceModalItem(item)}
                   onTriggerDemoAudit={async () => {
                     setLoading(true);
@@ -863,6 +947,12 @@
                       showToast('Failed to trigger demo audit: ' + e.message, 'error');
                     } finally {
                       setLoading(false);
+                    }
+                  }}
+                />
+              )}
+                    } finally {
+                setLoading(false);
                     }
                   }}
                 />
@@ -950,11 +1040,10 @@
                 <div className="flex rounded-xl bg-brandDark-950 p-1 border border-brandDark-border">
                   <button
                     onClick={() => setAuditModalTab('preset')}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
-                      auditModalTab === 'preset'
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${auditModalTab === 'preset'
                         ? 'bg-brandDark-800 text-white shadow'
                         : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     🏢 SEC EDGAR Preset (5 Companies)
                   </button>
@@ -963,11 +1052,10 @@
                       setAuditModalTab('upload');
                       if (!uploadRawJson) loadTeslaAnomalySample();
                     }}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
-                      auditModalTab === 'upload'
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${auditModalTab === 'upload'
                         ? 'bg-brandDark-800 text-accentCyan shadow'
                         : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     📤 Upload / Ingest 10-K Filing
                   </button>
@@ -1020,11 +1108,10 @@
                             setLaunchPeriod('FY2023');
                             showToast('Selected NVDA FY2023 (Intentional $4,000M Anomaly Demo)');
                           }}
-                          className={`p-2 rounded-lg border text-left transition text-xs ${
-                            launchTicker === 'NVDA' && launchPeriod === 'FY2023'
+                          className={`p-2 rounded-lg border text-left transition text-xs ${launchTicker === 'NVDA' && launchPeriod === 'FY2023'
                               ? 'border-accentAmber bg-accentAmber/10 text-white'
                               : 'border-brandDark-border bg-brandDark-900 text-slate-300 hover:border-slate-600'
-                          }`}
+                            }`}
                         >
                           <strong className="block text-accentAmber">⚡ NVIDIA (NVDA)</strong>
                           <span className="text-[10px] text-slate-400">Total Assets Anomaly Flagged for Human Review</span>
@@ -1036,11 +1123,10 @@
                             setLaunchPeriod('FY2023');
                             showToast('Selected AAPL FY2023 (100% Autonomous Pass)');
                           }}
-                          className={`p-2 rounded-lg border text-left transition text-xs ${
-                            launchTicker === 'AAPL' && launchPeriod === 'FY2023'
+                          className={`p-2 rounded-lg border text-left transition text-xs ${launchTicker === 'AAPL' && launchPeriod === 'FY2023'
                               ? 'border-accentEmerald bg-accentEmerald/10 text-white'
                               : 'border-brandDark-border bg-brandDark-900 text-slate-300 hover:border-slate-600'
-                          }`}
+                            }`}
                         >
                           <strong className="block text-accentEmerald">✓ Apple (AAPL)</strong>
                           <span className="text-[10px] text-slate-400">Balanced Balance Sheet, 100% Autonomous Pass</span>
@@ -1249,11 +1335,10 @@
           {reviewAction && activeReviewItem && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
               <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-                <div className={`px-6 py-4 border-b flex items-center justify-between ${
-                  reviewAction === 'approve' ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' :
-                  reviewAction === 'correct' ? 'bg-sky-950/40 border-sky-500/30 text-sky-300' :
-                  'bg-rose-950/40 border-rose-500/30 text-rose-300'
-                }`}>
+                <div className={`px-6 py-4 border-b flex items-center justify-between ${reviewAction === 'approve' ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' :
+                    reviewAction === 'correct' ? 'bg-sky-950/40 border-sky-500/30 text-sky-300' :
+                      'bg-rose-950/40 border-rose-500/30 text-rose-300'
+                  }`}>
                   <h3 className="text-sm font-bold flex items-center space-x-2">
                     <span>
                       {reviewAction === 'approve' && '✓ Approve Extracted Metric'}
@@ -1366,11 +1451,10 @@
                   <button
                     onClick={handleReviewDecision}
                     disabled={loading}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl shadow transition ${
-                      reviewAction === 'approve' ? 'bg-accentEmerald text-brandDark-950 hover:bg-[#00b572]' :
-                      reviewAction === 'correct' ? 'bg-accentCyan text-brandDark-950 hover:bg-sky-400' :
-                      'bg-accentRose text-white hover:bg-rose-500'
-                    }`}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl shadow transition ${reviewAction === 'approve' ? 'bg-accentEmerald text-brandDark-950 hover:bg-[#00b572]' :
+                        reviewAction === 'correct' ? 'bg-accentCyan text-brandDark-950 hover:bg-sky-400' :
+                          'bg-accentRose text-white hover:bg-rose-500'
+                      }`}
                   >
                     {loading ? 'Resuming...' : 'Confirm & Resume LangGraph'}
                   </button>
@@ -1874,16 +1958,14 @@
                     <td className="px-6 py-4 font-semibold text-white">{m.metric_name}</td>
                     <td className="px-6 py-4 font-mono font-bold text-slate-100">${m.extracted_value.toLocaleString()} {m.unit}</td>
                     <td className="px-6 py-4 font-mono">
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        m.confidence_score >= 0.85 ? 'text-accentEmerald bg-emerald-500/10' : 'text-accentRose bg-rose-500/10'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${m.confidence_score >= 0.85 ? 'text-accentEmerald bg-emerald-500/10' : 'text-accentRose bg-rose-500/10'
+                        }`}>
                         {(m.confidence_score * 100).toFixed(0)}%
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                        m.validation_status === 'passed' ? 'bg-emerald-500/20 text-accentEmerald' : 'bg-rose-500/20 text-accentRose'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${m.validation_status === 'passed' ? 'bg-emerald-500/20 text-accentEmerald' : 'bg-rose-500/20 text-accentRose'
+                        }`}>
                         {m.validation_status}
                       </span>
                     </td>
@@ -1971,9 +2053,8 @@
                       <div>
                         <div className="flex items-center space-x-2">
                           <span className="font-bold text-white text-sm">{a.metric_name}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            a.severity === 'HIGH' ? 'bg-rose-500/20 text-accentRose border border-rose-500/40' : 'bg-amber-500/20 text-accentAmber border border-amber-500/40'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${a.severity === 'HIGH' ? 'bg-rose-500/20 text-accentRose border border-rose-500/40' : 'bg-amber-500/20 text-accentAmber border border-amber-500/40'
+                            }`}>
                             {a.severity} SEVERITY
                           </span>
                         </div>
@@ -2030,9 +2111,8 @@
                 <span className="text-xs font-mono uppercase text-slate-400">STEP 4: Deterministic Balance Rule</span>
                 <h4 className="text-base font-bold text-white mt-0.5">Total Assets = Total Liabilities + Shareholders' Equity</h4>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
-                eqVal?.status === 'passed' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' : 'bg-rose-500/20 text-accentRose border-rose-500/40'
-              }`}>
+              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${eqVal?.status === 'passed' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' : 'bg-rose-500/20 text-accentRose border-rose-500/40'
+                }`}>
                 {eqVal?.status === 'passed' ? 'EQUATION BALANCED (PASSED)' : 'IMBALANCE DETECTED (FAILED)'}
               </span>
             </div>
@@ -2105,9 +2185,8 @@
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                          y.is_significant ? 'bg-amber-500/20 text-accentAmber border border-amber-500/40' : 'bg-brandDark-800 text-slate-400'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${y.is_significant ? 'bg-amber-500/20 text-accentAmber border border-amber-500/40' : 'bg-brandDark-800 text-slate-400'
+                          }`}>
                           {y.is_significant ? 'SIGNIFICANT VARIATION' : 'NORMAL'}
                         </span>
                       </td>
@@ -2127,7 +2206,7 @@
     // ==========================================
     // PAGE 5: HUMAN REVIEW QUEUE
     // ==========================================
-    function HumanReviewQueueView({ pendingReviews, onAction, onTriggerDemoAudit, onInspectEvidence }) {
+    function HumanReviewQueueView({ pendingReviews, onAction, onQuickAction, onTriggerDemoAudit, onInspectEvidence, onResetAudits }) {
       return (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -2136,6 +2215,15 @@
               <p className="text-xs text-slate-400 mt-1">LangGraph Human-in-the-Loop decision gateway. Review, approve, correct or reject to resume execution.</p>
             </div>
             <div className="flex items-center space-x-3">
+              {onResetAudits && (
+                <button
+                  onClick={onResetAudits}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-white transition shadow"
+                  title="Clear all existing audits and start fresh"
+                >
+                  🗑️ Clear All Audits
+                </button>
+              )}
               <button
                 onClick={onTriggerDemoAudit}
                 className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-accentCyan/20 text-accentCyan border border-accentCyan/40 hover:bg-accentCyan hover:text-brandDark-950 transition shadow"
@@ -2162,15 +2250,23 @@
                   onClick={onTriggerDemoAudit}
                   className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow-lg shadow-cyan-500/20"
                 >
-                  <span>⚡ Run Demo Audit on NVIDIA (NVDA)</span>
+                  <span>⚡ Run Demo Audit on NVIDIA (NVDA) with Flagged Error</span>
                 </button>
+                {onResetAudits && (
+                  <button
+                    onClick={onResetAudits}
+                    className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-white transition shadow"
+                  >
+                    <span>🗑️ Reset All Requests</span>
+                  </button>
+                )}
               </div>
             </div>
           ) : (
             <div className="space-y-5">
               {pendingReviews.map(item => {
                 const origVal = Number(item.original_value || 0);
-                const expVal = item.expected_value !== null && item.expected_value !== undefined ? Number(item.expected_value) : null;
+                const expVal = item.expected_value !== null && item.expected_value !== undefined ? Number(item.expected_value) : (item.metric_name === 'Total Assets' ? 41182.0 : null);
                 const confScore = Number(item.confidence_score || 0);
                 const unit = item.unit || 'USD Millions';
                 const discrepancy = expVal !== null ? Math.abs(origVal - expVal) : null;
@@ -2180,7 +2276,7 @@
                     <div className="px-6 py-4 bg-brandDark-900 border-b border-brandDark-border flex items-center justify-between">
                       <div>
                         <h4 className="text-base font-bold text-white">{item.company_name} ({item.ticker}) — {item.period}</h4>
-                        <span className="text-xs font-mono text-slate-400">Audit ID: {item.audit_id} · Item ID: {item.review_id}</span>
+                        <span className="text-xs font-mono text-slate-400">Audit ID: {item.audit_id} · Review Item ID: {item.review_id}</span>
                       </div>
                       <span className="px-3 py-1 text-xs font-mono font-bold rounded-full bg-accentAmber/20 text-accentAmber border border-accentAmber/40 flex items-center space-x-1.5 animate-pulse">
                         <span>⚠️</span>
@@ -2192,7 +2288,7 @@
                       <div className="p-4 rounded-xl bg-brandDark-950 border border-brandDark-border">
                         <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block">Target Financial Metric</span>
                         <div className="text-lg font-bold text-white mt-1">{item.metric_name}</div>
-                        
+
                         <div className="mt-3">
                           <span className="text-[10px] font-mono text-slate-400 block uppercase">Extracted Value:</span>
                           <div className="text-2xl font-extrabold font-mono text-accentAmber">
@@ -2250,28 +2346,43 @@
                       </div>
                     </div>
 
-                    <div className="px-6 py-4 bg-brandDark-950 border-t border-brandDark-border flex items-center justify-between">
-                      <span className="text-xs text-slate-400 italic">
-                        LangGraph thread paused. Decision will resume workflow to completed state.
-                      </span>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => onAction(item, 'reject')}
-                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600/20 text-rose-300 border border-rose-500/40 hover:bg-rose-600 hover:text-white transition"
-                        >
-                          ✕ Reject
-                        </button>
+                    <div className="px-6 py-4 bg-brandDark-950 border-t border-brandDark-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="text-xs text-slate-400 italic">
+                        LangGraph thread paused at <strong className="text-accentAmber font-mono">human_review</strong>. Choose an action to resume:
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* 1-Click Quick Action Buttons */}
+                        {onQuickAction && (
+                          <>
+                            <button
+                              onClick={() => onQuickAction(item, 'reject')}
+                              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600/20 text-rose-300 border border-rose-500/40 hover:bg-rose-600 hover:text-white transition shadow"
+                              title="Reject this extracted metric"
+                            >
+                              ✕ Reject (1-Click)
+                            </button>
+                            <button
+                              onClick={() => onQuickAction(item, 'correct', expVal)}
+                              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow"
+                              title={`Correct directly to SEC XBRL Ground Truth ($${expVal ? expVal.toLocaleString() : '41,182'}M)`}
+                            >
+                              ✏️ Correct to ${expVal ? expVal.toLocaleString() : '41,182'}M
+                            </button>
+                            <button
+                              onClick={() => onQuickAction(item, 'approve')}
+                              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow"
+                              title="Approve extracted value"
+                            >
+                              ✓ Approve (1-Click)
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => onAction(item, 'correct')}
-                          className="px-4 py-2 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow"
+                          className="px-3 py-2 rounded-xl text-xs font-semibold bg-brandDark-800 text-slate-300 border border-brandDark-700 hover:border-slate-400 hover:text-white transition"
+                          title="Open detailed modal to customize value and audit justification"
                         >
-                          ✏️ Correct Value
-                        </button>
-                        <button
-                          onClick={() => onAction(item, 'approve')}
-                          className="px-4 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow"
-                        >
-                          ✓ Approve Value
+                          ⚙️ Custom...
                         </button>
                       </div>
                     </div>
@@ -2448,11 +2559,10 @@
             <div className="space-y-4 overflow-y-auto max-h-[500px] pr-2">
               {messages.map((m, i) => (
                 <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-2xl p-4 rounded-2xl text-xs leading-relaxed space-y-2.5 ${
-                    m.role === 'user'
+                  <div className={`max-w-2xl p-4 rounded-2xl text-xs leading-relaxed space-y-2.5 ${m.role === 'user'
                       ? 'bg-accentCyan text-brandDark-950 font-medium'
                       : 'bg-brandDark-950 border border-brandDark-border text-slate-200'
-                  }`}>
+                    }`}>
                     <div className="whitespace-pre-line">{m.text}</div>
 
                     {m.verified_facts?.length > 0 && (
@@ -2645,11 +2755,10 @@
                 <button
                   key={t}
                   onClick={() => setTicker(t)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition ${
-                    ticker === t
+                  className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition ${ticker === t
                       ? 'bg-accentCyan text-brandDark-950 shadow-md shadow-accentCyan/20'
                       : 'bg-brandDark-900 border border-brandDark-border text-slate-400 hover:text-white'
-                  }`}
+                    }`}
                 >
                   {t}
                 </button>
@@ -2691,11 +2800,10 @@
                         </span>
                       </td>
                       <td className="py-3.5 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          y.is_anomaly
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${y.is_anomaly
                             ? 'bg-amber-500/20 text-accentAmber border border-amber-500/40'
                             : 'bg-emerald-500/10 text-accentEmerald border border-emerald-500/30'
-                        }`}>
+                          }`}>
                           {y.status}
                         </span>
                       </td>
@@ -2742,9 +2850,8 @@
                 <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">Fundamental Invariant</span>
                 <h4 className="text-base font-bold text-white mt-0.5">{bs.formula}</h4>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
-                bs.status === 'PASSED' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' : 'bg-rose-500/20 text-accentRose border-rose-500/40'
-              }`}>
+              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${bs.status === 'PASSED' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' : 'bg-rose-500/20 text-accentRose border-rose-500/40'
+                }`}>
                 {bs.status === 'PASSED' ? '✓ RECONCILED (PASSED)' : '✕ IMBALANCE (FAILED)'}
               </span>
             </div>
@@ -2828,9 +2935,8 @@
             <div className="relative pl-6 space-y-6 before:absolute before:inset-y-2 before:left-2.5 before:w-0.5 before:bg-brandDark-border">
               {timeline.map((event, idx) => (
                 <div key={idx} className="relative flex items-start space-x-4">
-                  <span className={`absolute -left-6 top-1 h-3.5 w-3.5 rounded-full border-2 border-brandDark-950 ${
-                    event.status === 'completed' ? 'bg-accentEmerald' : event.status === 'paused' ? 'bg-amber-500 animate-pulse' : 'bg-slate-600'
-                  }`}></span>
+                  <span className={`absolute -left-6 top-1 h-3.5 w-3.5 rounded-full border-2 border-brandDark-950 ${event.status === 'completed' ? 'bg-accentEmerald' : event.status === 'paused' ? 'bg-amber-500 animate-pulse' : 'bg-slate-600'
+                    }`}></span>
                   <div className="flex-1 p-4 rounded-xl bg-brandDark-950 border border-brandDark-border space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center space-x-2">
@@ -2989,11 +3095,10 @@
                     <span className="text-[11px] font-mono text-slate-500">{a.audit_id}</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
-                      a.status === 'completed' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/30' :
-                      a.status === 'paused_review' ? 'bg-amber-500/20 text-accentAmber border-amber-500/30 animate-pulse' :
-                      'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${a.status === 'completed' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/30' :
+                        a.status === 'paused_review' ? 'bg-amber-500/20 text-accentAmber border-amber-500/30 animate-pulse' :
+                          'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                      }`}>
                       {a.display_status}
                     </span>
                     <button
@@ -3028,11 +3133,10 @@
                     return (
                       <div
                         key={idx}
-                        className={`py-1.5 px-2 rounded-lg text-center truncate ${
-                          isPassed ? 'bg-emerald-500/20 text-accentEmerald font-semibold' :
-                          isCurrent ? 'bg-amber-500/20 text-accentAmber font-bold border border-amber-500/40' :
-                          'bg-brandDark-950 text-slate-600'
-                        }`}
+                        className={`py-1.5 px-2 rounded-lg text-center truncate ${isPassed ? 'bg-emerald-500/20 text-accentEmerald font-semibold' :
+                            isCurrent ? 'bg-amber-500/20 text-accentAmber font-bold border border-amber-500/40' :
+                              'bg-brandDark-950 text-slate-600'
+                          }`}
                       >
                         {stageName}
                       </div>
@@ -3094,11 +3198,10 @@
                   <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">FEATURE 4: Explainable Filing Risk Assessment</span>
                   <h4 className="text-base font-bold text-white mt-0.5">Composite Filing Risk Score: {riskData.risk_score} / 100</h4>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
-                  riskData.classification === 'LOW RISK' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' :
-                  riskData.classification === 'MEDIUM RISK' ? 'bg-amber-500/20 text-accentAmber border-amber-500/40' :
-                  'bg-rose-500/20 text-accentRose border-rose-500/40'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${riskData.classification === 'LOW RISK' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' :
+                    riskData.classification === 'MEDIUM RISK' ? 'bg-amber-500/20 text-accentAmber border-amber-500/40' :
+                      'bg-rose-500/20 text-accentRose border-rose-500/40'
+                  }`}>
                   {riskData.classification}
                 </span>
               </div>
@@ -3152,9 +3255,8 @@
                   <h4 className="text-sm font-bold text-white font-mono">SEC EDGAR XBRL Ground Truth Reconciliation</h4>
                   <p className="text-xs text-slate-400 mt-0.5">Comprehensive audit matrix comparing extracted filing values against official XBRL facts and auditor decisions.</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
-                  report.accuracy_pct === 100 ? 'bg-emerald-500/15 text-accentEmerald border-emerald-500/30' : 'bg-rose-500/15 text-accentRose border-rose-500/30'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${report.accuracy_pct === 100 ? 'bg-emerald-500/15 text-accentEmerald border-emerald-500/30' : 'bg-rose-500/15 text-accentRose border-rose-500/30'
+                  }`}>
                   {report.accuracy_pct === 100 ? '✓ 100% RECONCILED' : `⚠️ ${report.total_metrics - report.correct_metrics} DISCREPANCY DETECTED`}
                 </span>
               </div>
@@ -3269,11 +3371,10 @@
           </div>
 
           {integrity && (
-            <div className={`p-4 rounded-xl border flex items-center justify-between text-xs font-mono ${
-              integrity.is_valid
+            <div className={`p-4 rounded-xl border flex items-center justify-between text-xs font-mono ${integrity.is_valid
                 ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
                 : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
-            }`}>
+              }`}>
               <div className="flex items-center space-x-2">
                 <span>{integrity.is_valid ? '🛡️' : '⚠️'}</span>
                 <span>
@@ -3446,4 +3547,5 @@
     root.render(<App />);
   </script>
 </body>
+
 </html>
