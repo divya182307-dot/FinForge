@@ -171,19 +171,52 @@
 
     // Multi-Bar Financial Performance Chart Component
     function PerformanceChart({ ticker = 'AAPL' }) {
-      const data = [
-        { year: '2020', rev: 274, net: 57, ocf: 80 },
-        { year: '2021', rev: 365, net: 94, ocf: 104 },
-        { year: '2022', rev: 394, net: 99, ocf: 122 },
-        { year: '2023', rev: 383, net: 96, ocf: 110 },
-        { year: '2024', rev: 410, net: 102, ocf: 118 },
-      ];
-      const maxVal = 500;
+      const companyHistories = {
+        AAPL: [
+          { year: '2020', rev: 274, net: 57, ocf: 80 },
+          { year: '2021', rev: 365, net: 94, ocf: 104 },
+          { year: '2022', rev: 394, net: 99, ocf: 122 },
+          { year: '2023', rev: 383, net: 96, ocf: 110 },
+          { year: '2024', rev: 391, net: 100, ocf: 118 },
+        ],
+        MSFT: [
+          { year: '2020', rev: 143, net: 44, ocf: 60 },
+          { year: '2021', rev: 168, net: 61, ocf: 76 },
+          { year: '2022', rev: 198, net: 72, ocf: 89 },
+          { year: '2023', rev: 211, net: 72, ocf: 87 },
+          { year: '2024', rev: 245, net: 88, ocf: 118 },
+        ],
+        AMZN: [
+          { year: '2020', rev: 386, net: 21, ocf: 66 },
+          { year: '2021', rev: 469, net: 33, ocf: 46 },
+          { year: '2022', rev: 513, net: -2, ocf: 46 },
+          { year: '2023', rev: 574, net: 30, ocf: 84 },
+          { year: '2024', rev: 620, net: 48, ocf: 112 },
+        ],
+        GOOGL: [
+          { year: '2020', rev: 182, net: 40, ocf: 65 },
+          { year: '2021', rev: 257, net: 76, ocf: 91 },
+          { year: '2022', rev: 282, net: 59, ocf: 91 },
+          { year: '2023', rev: 307, net: 73, ocf: 101 },
+          { year: '2024', rev: 350, net: 86, ocf: 115 },
+        ],
+        NVDA: [
+          { year: '2020', rev: 10, net: 2, ocf: 4 },
+          { year: '2021', rev: 16, net: 4, ocf: 5 },
+          { year: '2022', rev: 26, net: 9, ocf: 8 },
+          { year: '2023', rev: 27, net: 4, ocf: 5 },
+          { year: '2024', rev: 61, net: 30, ocf: 28 },
+        ]
+      };
+
+      const data = companyHistories[ticker] || companyHistories['AAPL'];
+      const maxVal = ticker === 'AMZN' ? 700 : ticker === 'NVDA' ? 80 : 500;
 
       return (
         <div className="pt-2">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-mono">
-            <span>500B</span>
+            <span>{maxVal}B</span>
+            <span className="text-[11px] text-accentCyan font-bold">{ticker} Multi-Year Financials</span>
           </div>
           <div className="h-44 flex items-end justify-between px-2 pt-2 border-b border-brandDark-700/60 pb-2 relative">
             <div className="absolute inset-x-0 top-0 border-b border-brandDark-800/40 pointer-events-none"></div>
@@ -192,26 +225,26 @@
             <div className="absolute inset-x-0 top-3/4 border-b border-brandDark-800/40 pointer-events-none"></div>
 
             {data.map(d => {
-              const hRev = (d.rev / maxVal) * 100;
-              const hNet = (d.net / maxVal) * 100;
-              const hOcf = (d.ocf / maxVal) * 100;
+              const hRev = Math.max(4, (d.rev / maxVal) * 100);
+              const hNet = Math.max(4, (Math.max(0, d.net) / maxVal) * 100);
+              const hOcf = Math.max(4, (d.ocf / maxVal) * 100);
               return (
                 <div key={d.year} className="flex flex-col items-center space-y-2 z-10 group">
                   <div className="flex items-end space-x-1.5 h-36">
                     <div
                       style={{ height: `${hRev}%` }}
-                      className="w-3 rounded-t bg-gradient-to-t from-emerald-600 to-accentEmerald transition-all hover:brightness-125"
-                      title={`Revenue: $${d.rev}B`}
+                      className="w-3 rounded-t bg-gradient-to-t from-emerald-600 to-accentEmerald transition-all hover:brightness-125 cursor-pointer"
+                      title={`${d.year} Revenue: $${d.rev}B`}
                     ></div>
                     <div
                       style={{ height: `${hNet}%` }}
-                      className="w-3 rounded-t bg-gradient-to-t from-blue-600 to-sky-400 transition-all hover:brightness-125"
-                      title={`Net Income: $${d.net}B`}
+                      className="w-3 rounded-t bg-gradient-to-t from-blue-600 to-sky-400 transition-all hover:brightness-125 cursor-pointer"
+                      title={`${d.year} Net Income: $${d.net}B`}
                     ></div>
                     <div
                       style={{ height: `${hOcf}%` }}
-                      className="w-3 rounded-t bg-gradient-to-t from-indigo-600 to-accentPurple transition-all hover:brightness-125"
-                      title={`Operating Cash Flow: $${d.ocf}B`}
+                      className="w-3 rounded-t bg-gradient-to-t from-indigo-600 to-accentPurple transition-all hover:brightness-125 cursor-pointer"
+                      title={`${d.year} Operating Cash Flow: $${d.ocf}B`}
                     ></div>
                   </div>
                   <span className="text-[11px] font-mono text-slate-400 group-hover:text-white transition">
@@ -223,7 +256,7 @@
           </div>
           <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-1">
             <span>0B</span>
-            <span>Scale: USD Billions</span>
+            <span>Scale: USD Billions (Interactive)</span>
           </div>
         </div>
       );
@@ -755,6 +788,7 @@
     // PAGE 1: OVERVIEW DASHBOARD (EXACT SCREENSHOT)
     // ==========================================
     function OverviewView({ summary, audits, pendingReviews, onOpenReviewItem, onNavigateReview }) {
+      const [selectedTicker, setSelectedTicker] = React.useState('AAPL');
       const kpis = summary?.kpis || {
         companies_audited: 27,
         total_metrics_extracted: 2184,
@@ -883,7 +917,11 @@
                     <h3 className="text-sm font-bold text-white">Financial Performance</h3>
                     <span className="text-xs text-slate-500">(Sample Data)</span>
                   </div>
-                  <select className="bg-brandDark-900 border border-brandDark-border rounded-lg px-2 py-1 text-xs font-mono text-slate-300 focus:outline-none">
+                  <select
+                    value={selectedTicker}
+                    onChange={(e) => setSelectedTicker(e.target.value)}
+                    className="bg-brandDark-900 border border-brandDark-border rounded-lg px-2 py-1 text-xs font-mono text-slate-300 focus:outline-none"
+                  >
                     <option value="AAPL">AAPL ⌄</option>
                     <option value="MSFT">MSFT ⌄</option>
                     <option value="AMZN">AMZN ⌄</option>
@@ -907,7 +945,7 @@
                   </div>
                 </div>
 
-                <PerformanceChart ticker="AAPL" />
+                <PerformanceChart ticker={selectedTicker} />
               </div>
             </div>
 
