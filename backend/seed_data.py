@@ -69,6 +69,7 @@ COMPANY_FACTS = {
             "Total Liabilities": 290437.0,
             "Shareholders' Equity": 62146.0,
             "Operating Cash Flow": 110543.0,
+            "Cash and Cash Equivalents": 29965.0,
             "Capital Expenditures": 10959.0
         },
         "FY2022": {
@@ -90,6 +91,7 @@ COMPANY_FACTS = {
             "Total Liabilities": 205753.0,
             "Shareholders' Equity": 206223.0,
             "Operating Cash Flow": 87582.0,
+            "Cash and Cash Equivalents": 34704.0,
             "Capital Expenditures": 28107.0
         },
         "FY2022": {
@@ -111,6 +113,7 @@ COMPANY_FACTS = {
             "Total Liabilities": 326101.0,
             "Shareholders' Equity": 201753.0,
             "Operating Cash Flow": 84946.0,
+            "Cash and Cash Equivalents": 73890.0,
             "Capital Expenditures": 48100.0
         },
         "FY2022": {
@@ -132,6 +135,7 @@ COMPANY_FACTS = {
             "Total Liabilities": 119041.0,
             "Shareholders' Equity": 283351.0,
             "Operating Cash Flow": 101746.0,
+            "Cash and Cash Equivalents": 24048.0,
             "Capital Expenditures": 32251.0
         },
         "FY2022": {
@@ -153,6 +157,7 @@ COMPANY_FACTS = {
             "Total Liabilities": 22750.0,
             "Shareholders' Equity": 42978.0,
             "Operating Cash Flow": 28090.0,
+            "Cash and Cash Equivalents": 7280.0,
             "Capital Expenditures": 1056.0
         },
         "FY2023": {
@@ -164,7 +169,8 @@ COMPANY_FACTS = {
             "Total Assets": 41182.0,
             "Total Liabilities": 19081.0,
             "Shareholders' Equity": 22101.0,
-            "Operating Cash Flow": 5641.0
+            "Operating Cash Flow": 5641.0,
+            "Cash and Cash Equivalents": 3389.0
         }
     }
 }
@@ -236,6 +242,14 @@ SIMULATED_EXTRACTIONS = {
                 "confidence_score": 0.98,
                 "source_evidence": "Operating income was $114,301 million for fiscal year 2023.",
                 "sec_filing_ref": "Form 10-K, Part II, Item 8, Page 48"
+            },
+            {
+                "metric_name": "Cash and Cash Equivalents",
+                "extracted_value": 29965.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Balance Sheets: Cash and cash equivalents were $29,965 million as of September 30, 2023.",
+                "sec_filing_ref": "Form 10-K, Part II, Item 8, Page 50"
             },
             {
                 "metric_name": "Capital Expenditures",
@@ -312,6 +326,14 @@ SIMULATED_EXTRACTIONS = {
                 "confidence_score": 0.98,
                 "source_evidence": "Operating income was $88,523 million.",
                 "sec_filing_ref": "Form 10-K, Part II, Item 8, Page 64"
+            },
+            {
+                "metric_name": "Cash and Cash Equivalents",
+                "extracted_value": 34704.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Balance Sheet: Cash and cash equivalents $34,704 million as of June 30, 2023.",
+                "sec_filing_ref": "Form 10-K, Part II, Item 8, Page 66"
             }
         ]
     },
@@ -380,6 +402,14 @@ SIMULATED_EXTRACTIONS = {
                 "confidence_score": 0.97,
                 "source_evidence": "Operating income $36,852 million.",
                 "sec_filing_ref": "Form 10-K, Part II, Item 8, Page 43"
+            },
+            {
+                "metric_name": "Cash and Cash Equivalents",
+                "extracted_value": 73890.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Balance Sheets: Cash, cash equivalents, and restricted cash $73,890 million as of December 31, 2023.",
+                "sec_filing_ref": "Form 10-K, Part II, Item 8, Page 45"
             }
         ]
     },
@@ -448,6 +478,14 @@ SIMULATED_EXTRACTIONS = {
                 "confidence_score": 0.98,
                 "source_evidence": "Income from operations was $84,293 million.",
                 "sec_filing_ref": "Form 10-K, Item 8, Page 51"
+            },
+            {
+                "metric_name": "Cash and Cash Equivalents",
+                "extracted_value": 24048.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Balance Sheets: Cash and cash equivalents $24,048 million as of December 31, 2023.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 53"
             }
         ]
     },
@@ -518,6 +556,14 @@ SIMULATED_EXTRACTIONS = {
                 "confidence_score": 0.98,
                 "source_evidence": "Operating income was $4,224 million for fiscal year 2023.",
                 "sec_filing_ref": "Form 10-K, Item 8, Page 47"
+            },
+            {
+                "metric_name": "Cash and Cash Equivalents",
+                "extracted_value": 3389.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Balance Sheets: Cash and cash equivalents $3,389 million as of January 29, 2023.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 49"
             }
         ],
         "FY2024": [
@@ -586,6 +632,14 @@ SIMULATED_EXTRACTIONS = {
                 "confidence_score": 0.98,
                 "source_evidence": "Operating income was $32,972 million.",
                 "sec_filing_ref": "Form 10-K, Item 8, Page 47"
+            },
+            {
+                "metric_name": "Cash and Cash Equivalents",
+                "extracted_value": 7280.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Balance Sheets: Cash, cash equivalents and marketable securities $7,280 million as of January 28, 2024.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 49"
             }
         ]
     }

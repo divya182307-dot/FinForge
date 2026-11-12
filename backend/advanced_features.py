@@ -1316,7 +1316,7 @@ def verify_audit_trail_integrity(audit_id: str) -> Dict[str, Any]:
 # -------------------------------------------------------------------------
 # FEATURE 12: Live 9-Stage Audit Monitoring
 # -------------------------------------------------------------------------
-def get_live_audit_monitoring() -> Dict[str, Any]:
+def get_live_audit_monitoring(audit_id: Optional[str] = None) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
 

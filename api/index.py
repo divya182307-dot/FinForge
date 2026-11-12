@@ -31,6 +31,7 @@ from backend.audit_service import (
     get_dashboard_summary,
     seed_companies_if_empty,
 )
+from backend.init_db import seed_demo_environment
 from backend.workflow_engine import AuditWorkflowGraph
 from backend.advanced_analytics import (
     compute_yoy_variance_analysis,
@@ -104,6 +105,24 @@ def get_frontend_html() -> str:
 # 5. Cold-Start Database Initialization & Path Normalization Middleware
 _initialized = False
 
+def ensure_database_ready():
+    global _initialized
+    if not _initialized:
+        try:
+            init_db()
+            seed_companies_if_empty()
+            # Ensure initial demonstration audits exist on cold-start
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as count FROM audit_runs")
+            count = cursor.fetchone()["count"]
+            conn.close()
+            if count == 0:
+                seed_demo_environment()
+            _initialized = True
+        except Exception as e:
+            logger.error("Database cold-start initialization error: %s", e)
+
 @app.middleware("http")
 async def vercel_request_pipeline(request: Request, call_next):
     # A. Strip any Vercel internal script prefix if injected into ASGI path
@@ -117,14 +136,7 @@ async def vercel_request_pipeline(request: Request, call_next):
             break
 
     # B. Cold-start DB init
-    global _initialized
-    if not _initialized:
-        try:
-            init_db()
-            seed_companies_if_empty()
-            _initialized = True
-        except Exception as e:
-            logger.error("Database cold-start initialization error: %s", e)
+    ensure_database_ready()
     return await call_next(request)
 
 
@@ -145,6 +157,7 @@ def root_health():
 
 @app.get("/companies")
 def root_companies():
+    ensure_database_ready()
     return get_all_companies()
 
 
@@ -154,6 +167,15 @@ def root_companies():
 class AuditRunRequest(BaseModel):
     ticker: str
     period: str = "FY2023"
+
+class FilingUploadRequest(BaseModel):
+    ticker: str = "DEMO"
+    company_name: Optional[str] = "Uploaded Filing Corp"
+    period: str = "FY2023"
+    sector: Optional[str] = "Corporate Financial Filing"
+    cik: Optional[str] = "0009999999"
+    metrics: Optional[List[Dict[str, Any]]] = None
+    raw_content: Optional[str] = None
 
 class ReviewDecisionRequest(BaseModel):
     decision: str
@@ -178,19 +200,52 @@ def health_check():
 @app.get("/api/companies")
 def api_get_companies():
     """1. GET /api/companies"""
+    ensure_database_ready()
     return get_all_companies()
 
 @app.post("/api/audit/run", status_code=201)
 def api_run_audit(req: AuditRunRequest):
     """2. POST /api/audit/run"""
+    ensure_database_ready()
     try:
         return start_audit_run(req.ticker, req.period)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/audit/upload", status_code=201)
+def api_upload_filing(req: FilingUploadRequest):
+    """2b. POST /api/audit/upload - Ingest custom/uploaded Form 10-K filing data"""
+    ensure_database_ready()
+    try:
+        metrics = req.metrics or []
+        if req.raw_content and not metrics:
+            import json as _json
+            try:
+                parsed = _json.loads(req.raw_content)
+                if isinstance(parsed, list):
+                    metrics = parsed
+                elif isinstance(parsed, dict):
+                    if "metrics" in parsed and isinstance(parsed["metrics"], list):
+                        metrics = parsed["metrics"]
+                    else:
+                        metrics = [{"metric_name": k, "extracted_value": float(v)} for k, v in parsed.items() if isinstance(v, (int, float))]
+            except Exception:
+                pass
+        return start_audit_run(
+            ticker=req.ticker,
+            period=req.period,
+            custom_extractions=metrics,
+            company_name=req.company_name,
+            cik=req.cik,
+            sector=req.sector
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/audit/{audit_id}")
 def api_get_audit(audit_id: str):
     """3. GET /api/audit/{id}"""
+    ensure_database_ready()
     details = get_audit_details(audit_id)
     if not details:
         raise HTTPException(status_code=404, detail="Audit run not found")
@@ -199,11 +254,13 @@ def api_get_audit(audit_id: str):
 @app.get("/api/reviews")
 def api_get_reviews(audit_id: Optional[str] = None):
     """4. GET /api/reviews"""
+    ensure_database_ready()
     return get_pending_reviews(audit_id)
 
 @app.post("/api/reviews/{review_id}/decision")
 def api_submit_review_decision(review_id: str, req: ReviewDecisionRequest):
     """5. POST /api/reviews/{id}/decision"""
+    ensure_database_ready()
     try:
         return process_review_decision(
             review_id,
@@ -220,6 +277,7 @@ def api_submit_review_decision(review_id: str, req: ReviewDecisionRequest):
 @app.get("/api/audit/{audit_id}/report")
 def api_get_audit_report(audit_id: str):
     """6. GET /api/audit/{id}/report"""
+    ensure_database_ready()
     report = get_accuracy_report(audit_id)
     if not report:
         raise HTTPException(status_code=404, detail="Accuracy report not ready")
@@ -228,6 +286,7 @@ def api_get_audit_report(audit_id: str):
 @app.get("/api/audit/{audit_id}/history")
 def api_get_audit_history(audit_id: str):
     """7. GET /api/audit/{id}/history"""
+    ensure_database_ready()
     return get_audit_history(audit_id)
 
 
@@ -237,22 +296,20 @@ def api_get_audit_history(audit_id: str):
 
 @app.get("/api/dashboard/summary")
 def api_dashboard_summary():
+    ensure_database_ready()
     return get_dashboard_summary()
 
 @app.get("/api/workflow/{audit_id}")
 def api_workflow_state(audit_id: str):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT thread_id FROM audit_runs WHERE audit_id = ?", (audit_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
+    ensure_database_ready()
+    wf_state = AuditWorkflowGraph.get_workflow_state(audit_id)
+    if not wf_state:
         raise HTTPException(status_code=404, detail="Audit workflow not found")
-    graph = AuditWorkflowGraph()
-    return graph.get_execution_state(row["thread_id"])
+    return wf_state
 
 @app.get("/api/audits")
 def api_list_audits():
+    ensure_database_ready()
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -270,71 +327,108 @@ def api_list_audits():
 # 12 Advanced Enterprise Feature Endpoints
 # ==========================================
 
+# Feature 1: Anomaly Explanation Engine
 @app.get("/api/audit/{audit_id}/anomalies")
+@app.get("/api/audit/{audit_id}/explanations")
 def api_anomalies(audit_id: str):
-    """Feature 1: Anomaly Explanation Engine"""
+    ensure_database_ready()
     return get_audit_anomalies_and_explanations(audit_id)
 
+# Feature 2: Smart Evidence Viewer
 @app.get("/api/audit/{audit_id}/evidence")
-def api_evidence(audit_id: str):
-    """Feature 2: Smart Evidence Viewer"""
-    return get_smart_evidence_viewer(audit_id)
+def api_evidence(audit_id: str, metric_id: Optional[str] = Query(None)):
+    ensure_database_ready()
+    return get_smart_evidence_viewer(audit_id, metric_id)
 
+# Feature 3: AI Copilot Chat Assistant
 @app.post("/api/copilot/chat")
 def api_copilot(req: CopilotChatRequest):
-    """Feature 3: AI Copilot Chat Assistant"""
+    ensure_database_ready()
     try:
         return process_copilot_chat(req.query, req.audit_id, req.session_history)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Feature 4: Financial Risk Score
+@app.get("/api/audit/{audit_id}/risk")
 @app.get("/api/audit/{audit_id}/risk-score")
 def api_risk_score(audit_id: str):
-    """Feature 4: Financial Risk Score"""
+    ensure_database_ready()
     return calculate_audit_risk_score(audit_id)
 
+# Feature 5: Multi-Company Peer Benchmarking
+@app.get("/api/benchmark")
+@app.get("/api/benchmarking")
 @app.get("/api/analytics/benchmarks")
-def api_benchmarks():
-    """Feature 5: Multi-Company Peer Benchmarking"""
-    return get_multi_company_benchmarking()
+def api_benchmarks(period: str = Query("FY2023")):
+    ensure_database_ready()
+    return get_multi_company_benchmarking(period)
 
+# Feature 6: Historical Financial Intelligence
+@app.get("/api/company/{ticker}/historical")
 @app.get("/api/company/{ticker}/history")
+@app.get("/api/historical/{ticker}")
 def api_company_history(ticker: str):
-    """Feature 6: Historical Financial Intelligence"""
+    ensure_database_ready()
     return get_company_historical_intelligence(ticker)
 
+# Feature 7: Accounting Reconciliation Workspace
 @app.get("/api/audit/{audit_id}/reconciliation")
 def api_reconciliation(audit_id: str):
-    """Feature 7: Accounting Reconciliation Workspace"""
+    ensure_database_ready()
     return get_accounting_reconciliation_workspace(audit_id)
 
+# Feature 8: Exportable Audit Report (HTML/Certificate)
 @app.get("/api/audit/{audit_id}/report/download")
+@app.get("/api/audit/{audit_id}/report/pdf")
+@app.get("/api/audit/{audit_id}/report/html")
 def api_report_download(audit_id: str, format: str = Query("html")):
-    """Feature 8: Exportable Audit Report (HTML/Certificate)"""
-    if format == "html":
+    ensure_database_ready()
+    if format in ("html", "pdf"):
         html_content = generate_audit_report_html(audit_id)
         return HTMLResponse(content=html_content)
     return generate_audit_report_payload(audit_id)
 
+# Feature 9: Chronological Audit Timeline
 @app.get("/api/audit/{audit_id}/timeline")
 def api_timeline(audit_id: str):
-    """Feature 9: Chronological Audit Timeline"""
+    ensure_database_ready()
     return get_audit_timeline(audit_id)
 
+# Feature 10: Reviewer Feedback Analytics
+@app.get("/api/reviewer/feedback")
 @app.get("/api/analytics/feedback")
 def api_feedback():
-    """Feature 10: Reviewer Feedback Analytics"""
+    ensure_database_ready()
     return get_reviewer_feedback_analytics()
 
+# Feature 11: Tamper-Evident SHA-256 Hash Chain Verification
 @app.get("/api/audit/{audit_id}/integrity")
 def api_integrity(audit_id: str):
-    """Feature 11: Tamper-Evident SHA-256 Hash Chain Verification"""
+    ensure_database_ready()
     return verify_audit_trail_integrity(audit_id)
 
+# Feature 12: Live 9-Stage Telemetry Monitoring
+@app.get("/api/audits/monitor")
 @app.get("/api/audit/{audit_id}/live-status")
-def api_live_monitoring(audit_id: str):
-    """Feature 12: Live 9-Stage Telemetry Monitoring"""
+def api_live_monitoring(audit_id: Optional[str] = None):
+    ensure_database_ready()
     return get_live_audit_monitoring(audit_id)
+
+# Supplementary Analytics & MCP Endpoints
+@app.get("/api/analytics/adaptive-thresholds")
+def api_adaptive_thresholds():
+    ensure_database_ready()
+    return get_adaptive_thresholds()
+
+@app.get("/api/mcp/tools")
+def api_mcp_tools():
+    return MCP_TOOLS_MANIFEST
+
+@app.get("/api/analytics/yoy/{ticker}")
+def api_yoy_analysis(ticker: str):
+    ensure_database_ready()
+    return compute_yoy_variance_analysis(ticker)
 
 
 # ==========================================
@@ -347,5 +441,3 @@ def spa_client_fallback(full_path: str):
     if full_path.startswith("api/") or full_path == "api":
         raise HTTPException(status_code=404, detail=f"API endpoint '/{full_path}' not found")
     return HTMLResponse(content=get_frontend_html(), status_code=200)
-
-

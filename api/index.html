@@ -277,6 +277,107 @@
       const [riskData, setRiskData] = useState(null);
 
       const [isStartAuditOpen, setIsStartAuditOpen] = useState(false);
+      const [auditModalTab, setAuditModalTab] = useState('preset'); // 'preset' | 'upload'
+      const [uploadTicker, setUploadTicker] = useState('TSLA');
+      const [uploadCompany, setUploadCompany] = useState('Tesla, Inc.');
+      const [uploadPeriod, setUploadPeriod] = useState('FY2023');
+      const [uploadSector, setUploadSector] = useState('Automotive & Clean Energy');
+      const [uploadRawJson, setUploadRawJson] = useState('');
+      const [uploadFileName, setUploadFileName] = useState('');
+
+      const loadTeslaAnomalySample = () => {
+        setUploadTicker('TSLA');
+        setUploadCompany('Tesla, Inc.');
+        setUploadPeriod('FY2023');
+        setUploadSector('Automotive & Clean Energy');
+        setUploadRawJson(JSON.stringify({
+          ticker: "TSLA",
+          company_name: "Tesla, Inc.",
+          period: "FY2023",
+          sector: "Automotive & Clean Energy",
+          metrics: [
+            { metric_name: "Revenue", extracted_value: 96773.0, unit: "USD Millions", confidence_score: 0.99, source_evidence: "Total revenues was $96,773 million (Form 10-K Item 8)", sec_filing_ref: "Item 8, Page 52" },
+            { metric_name: "Net Income", extracted_value: 14997.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Consolidated net income was $14,997 million.", sec_filing_ref: "Item 8, Page 52" },
+            { metric_name: "Total Assets", extracted_value: 112618.0, unit: "USD Millions", confidence_score: 0.61, source_evidence: "Consolidated Balance Sheets: Total assets recorded as [OCR Discrepancy] $112,618 million (expected $106,618 million).", sec_filing_ref: "Item 8, Page 54" },
+            { metric_name: "Total Liabilities", extracted_value: 43009.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Total liabilities were $43,009 million.", sec_filing_ref: "Item 8, Page 54" },
+            { metric_name: "Shareholders' Equity", extracted_value: 63609.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Total stockholders' equity was $63,609 million.", sec_filing_ref: "Item 8, Page 54" },
+            { metric_name: "Operating Cash Flow", extracted_value: 13256.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Net cash provided by operating activities was $13,256 million.", sec_filing_ref: "Item 8, Page 56" },
+            { metric_name: "Operating Income", extracted_value: 8891.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Operating income was $8,891 million.", sec_filing_ref: "Item 8, Page 52" },
+            { metric_name: "Cash and Cash Equivalents", extracted_value: 29094.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Cash, cash equivalents and marketable investments were $29,094 million.", sec_filing_ref: "Item 8, Page 54" }
+          ]
+        }, null, 2));
+        setUploadFileName('TSLA_FY2023_Flagged_Anomaly_Filing.json');
+      };
+
+      const loadTeslaCleanSample = () => {
+        setUploadTicker('TSLA');
+        setUploadCompany('Tesla, Inc.');
+        setUploadPeriod('FY2023');
+        setUploadSector('Automotive & Clean Energy');
+        setUploadRawJson(JSON.stringify({
+          ticker: "TSLA",
+          company_name: "Tesla, Inc.",
+          period: "FY2023",
+          sector: "Automotive & Clean Energy",
+          metrics: [
+            { metric_name: "Revenue", extracted_value: 96773.0, unit: "USD Millions", confidence_score: 0.99, source_evidence: "Total revenues was $96,773 million (Form 10-K Item 8)", sec_filing_ref: "Item 8, Page 52" },
+            { metric_name: "Net Income", extracted_value: 14997.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Consolidated net income was $14,997 million.", sec_filing_ref: "Item 8, Page 52" },
+            { metric_name: "Total Assets", extracted_value: 106618.0, unit: "USD Millions", confidence_score: 0.99, source_evidence: "Consolidated Balance Sheets: Total assets recorded as $106,618 million.", sec_filing_ref: "Item 8, Page 54" },
+            { metric_name: "Total Liabilities", extracted_value: 43009.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Total liabilities were $43,009 million.", sec_filing_ref: "Item 8, Page 54" },
+            { metric_name: "Shareholders' Equity", extracted_value: 63609.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Total stockholders' equity was $63,609 million.", sec_filing_ref: "Item 8, Page 54" },
+            { metric_name: "Operating Cash Flow", extracted_value: 13256.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Net cash provided by operating activities was $13,256 million.", sec_filing_ref: "Item 8, Page 56" },
+            { metric_name: "Operating Income", extracted_value: 8891.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Operating income was $8,891 million.", sec_filing_ref: "Item 8, Page 52" },
+            { metric_name: "Cash and Cash Equivalents", extracted_value: 29094.0, unit: "USD Millions", confidence_score: 0.98, source_evidence: "Cash, cash equivalents and marketable investments were $29,094 million.", sec_filing_ref: "Item 8, Page 54" }
+          ]
+        }, null, 2));
+        setUploadFileName('TSLA_FY2023_Clean_Balanced_Filing.json');
+      };
+
+      const handleUploadAudit = async () => {
+        if (!uploadRawJson) {
+          showToast('Please select a filing or load a sample filing payload', 'error');
+          return;
+        }
+        setLoading(true);
+        try {
+          let parsed;
+          try {
+            parsed = JSON.parse(uploadRawJson);
+          } catch (e) {
+            showToast('Invalid JSON in filing payload: ' + e.message, 'error');
+            setLoading(false);
+            return;
+          }
+          const payload = {
+            ticker: uploadTicker || parsed.ticker || 'CUSTOM',
+            period: uploadPeriod || parsed.period || 'FY2023',
+            company_name: uploadCompany || parsed.company_name || 'Uploaded Corporation',
+            sector: uploadSector || parsed.sector || 'General',
+            metrics: Array.isArray(parsed) ? parsed : (parsed.metrics || [])
+          };
+          const res = await fetch('/api/audit/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (res.ok) {
+            showToast(`Filing successfully audited! Audit ID: ${result.audit_id}. Status: ${result.status} (${result.escalated_count} flagged)`);
+            setIsStartAuditOpen(false);
+            await loadData();
+            if (result.audit_id) setSelectedAuditId(result.audit_id);
+            if (result.escalated_count > 0) {
+              setActiveNav('review');
+            }
+          } else {
+            showToast(result.error || 'Upload audit failed', 'error');
+          }
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
       const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
       const [launchTicker, setLaunchTicker] = useState('AAPL');
       const [launchPeriod, setLaunchPeriod] = useState('FY2023');
@@ -556,7 +657,14 @@
                     <span>Sample Data · For Demonstration Only</span>
                   </span>
                   <button
-                    onClick={() => setIsStartAuditOpen(true)}
+                    onClick={() => { setAuditModalTab('upload'); if (!uploadRawJson) loadTeslaAnomalySample(); setIsStartAuditOpen(true); }}
+                    className="px-3.5 py-2 rounded-xl bg-accentCyan/15 border border-accentCyan/40 hover:bg-accentCyan hover:text-brandDark-950 text-accentCyan text-xs font-bold flex items-center space-x-1.5 transition shadow"
+                  >
+                    <span>📤</span>
+                    <span>Upload 10-K Filing</span>
+                  </button>
+                  <button
+                    onClick={() => { setAuditModalTab('preset'); setIsStartAuditOpen(true); }}
                     className="px-4 py-2 rounded-xl bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-accentEmerald/20 transition-all"
                   >
                     <span className="text-sm font-extrabold">+</span>
@@ -702,67 +810,245 @@
             </main>
           </div>
 
-          {/* START NEW AUDIT MODAL */}
+          {/* START NEW AUDIT / INGEST FILING MODAL */}
           {isStartAuditOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-              <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+              <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-5">
                 <div className="flex items-center justify-between border-b border-brandDark-800 pb-3">
-                  <h3 className="text-base font-bold text-white flex items-center space-x-2">
-                    <span>🚀</span>
-                    <span>Initiate SEC 10-K Audit</span>
-                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">{auditModalTab === 'upload' ? '📤' : '🚀'}</span>
+                    <h3 className="text-base font-bold text-white">
+                      {auditModalTab === 'upload' ? 'Upload & Audit Custom Filing' : 'Initiate SEC EDGAR 10-K Audit'}
+                    </h3>
+                  </div>
                   <button onClick={() => setIsStartAuditOpen(false)} className="text-slate-400 hover:text-white">✕</button>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Select Target Corporation
-                    </label>
-                    <select
-                      value={launchTicker}
-                      onChange={(e) => setLaunchTicker(e.target.value)}
-                      className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-accentCyan font-mono"
-                    >
-                      <option value="AAPL">Apple Inc. (AAPL) - Tech Hardware</option>
-                      <option value="MSFT">Microsoft Corp. (MSFT) - Software & Cloud</option>
-                      <option value="AMZN">Amazon.com Inc. (AMZN) - E-Commerce & AWS</option>
-                      <option value="GOOGL">Alphabet Inc. (GOOGL) - Cloud & Media</option>
-                      <option value="NVDA">NVIDIA Corp. (NVDA) - AI Compute & Semi</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Reporting Period (10-K Filing)
-                    </label>
-                    <select
-                      value={launchPeriod}
-                      onChange={(e) => setLaunchPeriod(e.target.value)}
-                      className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-accentCyan font-mono"
-                    >
-                      <option value="FY2023">FY 2023 (Annual 10-K)</option>
-                      <option value="FY2024">FY 2024 (Annual 10-K - NVDA)</option>
-                      <option value="FY2022">FY 2022 (Historical Comparison)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-3 border-t border-brandDark-800">
+                {/* MODAL TABS */}
+                <div className="flex rounded-xl bg-brandDark-950 p-1 border border-brandDark-border">
                   <button
-                    onClick={() => setIsStartAuditOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-brandDark-800"
+                    onClick={() => setAuditModalTab('preset')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      auditModalTab === 'preset'
+                        ? 'bg-brandDark-800 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
                   >
-                    Cancel
+                    🏢 SEC EDGAR Preset (5 Companies)
                   </button>
                   <button
-                    onClick={handleStartAudit}
-                    disabled={loading}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow-lg shadow-accentEmerald/20"
+                    onClick={() => {
+                      setAuditModalTab('upload');
+                      if (!uploadRawJson) loadTeslaAnomalySample();
+                    }}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      auditModalTab === 'upload'
+                        ? 'bg-brandDark-800 text-accentCyan shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
                   >
-                    {loading ? 'Initializing Pipeline...' : 'Run Autonomous Audit'}
+                    📤 Upload / Ingest 10-K Filing
                   </button>
                 </div>
+
+                {auditModalTab === 'preset' ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Select Target Corporation
+                      </label>
+                      <select
+                        value={launchTicker}
+                        onChange={(e) => setLaunchTicker(e.target.value)}
+                        className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-accentCyan font-mono"
+                      >
+                        <option value="AAPL">Apple Inc. (AAPL) - Tech Hardware</option>
+                        <option value="MSFT">Microsoft Corp. (MSFT) - Software & Cloud</option>
+                        <option value="AMZN">Amazon.com Inc. (AMZN) - E-Commerce & AWS</option>
+                        <option value="GOOGL">Alphabet Inc. (GOOGL) - Cloud & Media</option>
+                        <option value="NVDA">NVIDIA Corp. (NVDA) - AI Compute & Semiconductors</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Reporting Period (10-K Filing)
+                      </label>
+                      <select
+                        value={launchPeriod}
+                        onChange={(e) => setLaunchPeriod(e.target.value)}
+                        className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-accentCyan font-mono"
+                      >
+                        <option value="FY2023">FY 2023 (Annual 10-K)</option>
+                        <option value="FY2024">FY 2024 (Annual 10-K)</option>
+                        <option value="FY2022">FY 2022 (Historical Comparison)</option>
+                      </select>
+                    </div>
+
+                    {/* Quick Demo Shortcuts */}
+                    <div className="p-3.5 rounded-xl bg-brandDark-950 border border-brandDark-border space-y-2">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Live Demo Scenarios:
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLaunchTicker('NVDA');
+                            setLaunchPeriod('FY2023');
+                            showToast('Selected NVDA FY2023 (Intentional $4,000M Anomaly Demo)');
+                          }}
+                          className={`p-2 rounded-lg border text-left transition text-xs ${
+                            launchTicker === 'NVDA' && launchPeriod === 'FY2023'
+                              ? 'border-accentAmber bg-accentAmber/10 text-white'
+                              : 'border-brandDark-border bg-brandDark-900 text-slate-300 hover:border-slate-600'
+                          }`}
+                        >
+                          <strong className="block text-accentAmber">⚡ NVIDIA (NVDA)</strong>
+                          <span className="text-[10px] text-slate-400">Total Assets Anomaly Flagged for Human Review</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLaunchTicker('AAPL');
+                            setLaunchPeriod('FY2023');
+                            showToast('Selected AAPL FY2023 (100% Autonomous Pass)');
+                          }}
+                          className={`p-2 rounded-lg border text-left transition text-xs ${
+                            launchTicker === 'AAPL' && launchPeriod === 'FY2023'
+                              ? 'border-accentEmerald bg-accentEmerald/10 text-white'
+                              : 'border-brandDark-border bg-brandDark-900 text-slate-300 hover:border-slate-600'
+                          }`}
+                        >
+                          <strong className="block text-accentEmerald">✓ Apple (AAPL)</strong>
+                          <span className="text-[10px] text-slate-400">Balanced Balance Sheet, 100% Autonomous Pass</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-3 pt-3 border-t border-brandDark-800">
+                      <button
+                        onClick={() => setIsStartAuditOpen(false)}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-brandDark-800"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleStartAudit}
+                        disabled={loading}
+                        className="px-5 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow-lg shadow-accentEmerald/20"
+                      >
+                        {loading ? 'Initializing Pipeline...' : 'Run Autonomous Audit'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 uppercase mb-1">Company Name</label>
+                        <input
+                          type="text"
+                          value={uploadCompany}
+                          onChange={(e) => setUploadCompany(e.target.value)}
+                          className="w-full bg-brandDark-950 border border-brandDark-border rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-accentCyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 uppercase mb-1">Ticker & Period</label>
+                        <div className="flex space-x-2">
+                          <input
+                            type="text"
+                            value={uploadTicker}
+                            onChange={(e) => setUploadTicker(e.target.value.toUpperCase())}
+                            className="w-1/2 bg-brandDark-950 border border-brandDark-border rounded-lg px-3 py-1.5 text-xs text-white font-mono uppercase focus:outline-none focus:border-accentCyan"
+                          />
+                          <input
+                            type="text"
+                            value={uploadPeriod}
+                            onChange={(e) => setUploadPeriod(e.target.value.toUpperCase())}
+                            className="w-1/2 bg-brandDark-950 border border-brandDark-border rounded-lg px-3 py-1.5 text-xs text-white font-mono uppercase focus:outline-none focus:border-accentCyan"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pre-Loaded Quick Loaders */}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={loadTeslaAnomalySample}
+                        className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-accentAmber/15 border border-accentAmber/40 text-accentAmber hover:bg-accentAmber hover:text-brandDark-950 transition"
+                      >
+                        ⚡ Load TSLA Flagged Sample ($6,000M Error)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={loadTeslaCleanSample}
+                        className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-accentEmerald/15 border border-accentEmerald/40 text-accentEmerald hover:bg-accentEmerald hover:text-brandDark-950 transition"
+                      >
+                        ✓ Load TSLA Clean Sample (Balanced)
+                      </button>
+                    </div>
+
+                    {/* File Input & Raw Payload Area */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-semibold text-slate-300 uppercase">
+                          Filing JSON Payload (or upload .json/.txt)
+                        </label>
+                        <label className="cursor-pointer text-[11px] text-accentCyan hover:underline font-semibold">
+                          Browse Local File
+                          <input
+                            type="file"
+                            accept=".json,.txt"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setUploadFileName(file.name);
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  setUploadRawJson(evt.target?.result || '');
+                                  showToast(`Loaded ${file.name}`);
+                                };
+                                reader.readAsText(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <textarea
+                        rows={7}
+                        value={uploadRawJson}
+                        onChange={(e) => setUploadRawJson(e.target.value)}
+                        placeholder='Paste filing JSON with metrics or click a sample loader above...'
+                        className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl p-3 text-[11px] font-mono text-slate-200 focus:outline-none focus:border-accentCyan resize-none"
+                      />
+                      {uploadFileName && (
+                        <span className="text-[10px] text-accentCyan font-mono block mt-1">
+                          📄 Loaded: {uploadFileName}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end space-x-3 pt-3 border-t border-brandDark-800">
+                      <button
+                        onClick={() => setIsStartAuditOpen(false)}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-brandDark-800"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleUploadAudit}
+                        disabled={loading || !uploadRawJson}
+                        className="px-5 py-2 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                      >
+                        {loading ? 'Ingesting & Auditing...' : '🚀 Ingest & Audit Filing'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1719,7 +2005,7 @@
     // ==========================================
     // PAGE 5: HUMAN REVIEW QUEUE
     // ==========================================
-    function HumanReviewQueueView({ pendingReviews, onAction, onTriggerDemoAudit }) {
+    function HumanReviewQueueView({ pendingReviews, onAction, onTriggerDemoAudit, onInspectEvidence }) {
       return (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -1730,97 +2016,146 @@
             <div className="flex items-center space-x-3">
               <button
                 onClick={onTriggerDemoAudit}
-                className="px-3 py-1 rounded-xl text-xs font-semibold bg-accentCyan/20 text-accentCyan border border-accentCyan/40 hover:bg-accentCyan hover:text-brandDark-950 transition"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-accentCyan/20 text-accentCyan border border-accentCyan/40 hover:bg-accentCyan hover:text-brandDark-950 transition shadow"
               >
                 ⚡ Trigger NVDA Demo Audit
               </button>
               <span className="px-3 py-1 rounded-full bg-accentAmber/20 text-accentAmber border border-accentAmber/40 font-mono text-xs font-bold">
-                {pendingReviews.length} Escalations Pending
+                {pendingReviews ? pendingReviews.length : 0} Escalations Pending
               </span>
             </div>
           </div>
 
-          {pendingReviews.length === 0 ? (
-            <div className="glow-card rounded-2xl p-12 text-center space-y-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-accentEmerald flex items-center justify-center mx-auto text-xl font-bold">✓</div>
+          {(!pendingReviews || pendingReviews.length === 0) ? (
+            <div className="glow-card rounded-2xl p-12 text-center space-y-5">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-accentEmerald flex items-center justify-center mx-auto text-2xl font-bold shadow-lg shadow-emerald-500/10">✓</div>
               <div>
-                <h4 className="text-base font-bold text-white">Review Queue Clear</h4>
+                <h4 className="text-lg font-bold text-white">Review Queue Clear</h4>
                 <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                  No execution threads are currently paused. Trigger an audit on NVIDIA (NVDA) to test the intentional financial discrepancy and LangGraph human review checkpoint.
+                  No execution threads are currently paused. All autonomous confidence thresholds (≥ 85%) and balance sheet equations have passed.
                 </p>
               </div>
-              <button
-                onClick={onTriggerDemoAudit}
-                className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow-lg shadow-cyan-500/20"
-              >
-                <span>⚡ Run Demo Audit on NVIDIA (NVDA)</span>
-              </button>
+              <div className="flex items-center justify-center space-x-4 pt-2">
+                <button
+                  onClick={onTriggerDemoAudit}
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow-lg shadow-cyan-500/20"
+                >
+                  <span>⚡ Run Demo Audit on NVIDIA (NVDA)</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-5">
-              {pendingReviews.map(item => (
-                <div key={item.review_id} className="glow-card rounded-2xl border-accentAmber/40 overflow-hidden shadow-2xl">
-                  <div className="px-6 py-4 bg-brandDark-900 border-b border-brandDark-border flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-bold text-white">{item.company_name} ({item.ticker}) — {item.period}</h4>
-                      <span className="text-xs font-mono text-slate-400">Audit ID: {item.audit_id}</span>
-                    </div>
-                    <span className="px-2.5 py-1 text-xs font-mono rounded bg-accentAmber/20 text-accentAmber border border-accentAmber/40">
-                      FLAGGED FOR HUMAN REVIEW
-                    </span>
-                  </div>
+              {pendingReviews.map(item => {
+                const origVal = Number(item.original_value || 0);
+                const expVal = item.expected_value !== null && item.expected_value !== undefined ? Number(item.expected_value) : null;
+                const confScore = Number(item.confidence_score || 0);
+                const unit = item.unit || 'USD Millions';
+                const discrepancy = expVal !== null ? Math.abs(origVal - expVal) : null;
 
-                  <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <span className="text-xs font-mono text-slate-400 uppercase">Target Metric</span>
-                      <div className="text-lg font-bold text-white mt-1">{item.metric_name}</div>
-                      <div className="text-2xl font-extrabold font-mono text-accentAmber mt-2">
-                        ${item.original_value.toLocaleString()} <span className="text-xs text-slate-400">{item.unit}</span>
+                return (
+                  <div key={item.review_id} className="glow-card rounded-2xl border-accentAmber/40 overflow-hidden shadow-2xl">
+                    <div className="px-6 py-4 bg-brandDark-900 border-b border-brandDark-border flex items-center justify-between">
+                      <div>
+                        <h4 className="text-base font-bold text-white">{item.company_name} ({item.ticker}) — {item.period}</h4>
+                        <span className="text-xs font-mono text-slate-400">Audit ID: {item.audit_id} · Item ID: {item.review_id}</span>
                       </div>
-                      {item.expected_value !== null && item.expected_value !== undefined && (
-                        <div className="text-xs font-mono text-accentEmerald font-bold mt-1">
-                          Expected (XBRL): ${Number(item.expected_value).toLocaleString()} {item.unit}
+                      <span className="px-3 py-1 text-xs font-mono font-bold rounded-full bg-accentAmber/20 text-accentAmber border border-accentAmber/40 flex items-center space-x-1.5 animate-pulse">
+                        <span>⚠️</span>
+                        <span>FLAGGED FOR HUMAN REVIEW</span>
+                      </span>
+                    </div>
+
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="p-4 rounded-xl bg-brandDark-950 border border-brandDark-border">
+                        <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block">Target Financial Metric</span>
+                        <div className="text-lg font-bold text-white mt-1">{item.metric_name}</div>
+                        
+                        <div className="mt-3">
+                          <span className="text-[10px] font-mono text-slate-400 block uppercase">Extracted Value:</span>
+                          <div className="text-2xl font-extrabold font-mono text-accentAmber">
+                            ${origVal.toLocaleString()} <span className="text-xs text-slate-400 font-normal">{unit}</span>
+                          </div>
                         </div>
-                      )}
-                      <div className="text-xs font-mono text-accentRose font-bold mt-1">
-                        Confidence: {(item.confidence_score * 100).toFixed(0)}%
+
+                        {expVal !== null && (
+                          <div className="mt-2.5 pt-2 border-t border-brandDark-border/80">
+                            <span className="text-[10px] font-mono text-slate-400 block uppercase">Expected Ground Truth:</span>
+                            <div className="text-sm font-bold font-mono text-accentEmerald">
+                              ${expVal.toLocaleString()} {unit}
+                            </div>
+                            {discrepancy !== null && discrepancy > 0 && (
+                              <div className="text-[11px] font-mono font-bold text-accentRose mt-0.5">
+                                Variance: ${discrepancy.toLocaleString()} {unit}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="mt-3 pt-2 border-t border-brandDark-border/80 flex items-center justify-between">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase">Confidence:</span>
+                          <span className="text-xs font-mono font-extrabold text-accentRose px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30">
+                            {(confScore * 100).toFixed(0)}% (Flagged)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-3">
+                        <div className="p-4 rounded-xl bg-brandDark-950 border border-accentAmber/30 text-xs">
+                          <span className="font-semibold text-accentAmber block mb-1 text-sm flex items-center space-x-1.5">
+                            <span>🔍</span>
+                            <span>Escalation Diagnostics:</span>
+                          </span>
+                          <p className="text-slate-200 leading-relaxed">{item.reason}</p>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-brandDark-950 border border-brandDark-border text-xs">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-semibold text-slate-300 block text-xs">SEC 10-K Evidence Snippet:</span>
+                            {onInspectEvidence && (
+                              <button
+                                onClick={() => onInspectEvidence(item)}
+                                className="text-[11px] text-accentCyan hover:underline font-semibold flex items-center space-x-1"
+                              >
+                                <span>📄 View in Smart Evidence Viewer</span>
+                              </button>
+                            )}
+                          </div>
+                          <p className="italic text-slate-300 bg-brandDark-900/60 p-2.5 rounded-lg border border-brandDark-border/50">
+                            "{item.source_evidence}"
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="md:col-span-2 space-y-3">
-                      <div className="p-3.5 rounded-xl bg-brandDark-950 border border-brandDark-border text-xs">
-                        <span className="font-semibold text-accentAmber block mb-1">Escalation Trigger:</span>
-                        <p className="text-slate-200">{item.reason}</p>
-                      </div>
-                      <div className="p-3.5 rounded-xl bg-brandDark-950 border border-brandDark-border text-xs">
-                        <span className="font-semibold text-slate-300 block mb-1">SEC 10-K Evidence:</span>
-                        <p className="italic text-slate-400">"{item.source_evidence}"</p>
+                    <div className="px-6 py-4 bg-brandDark-950 border-t border-brandDark-border flex items-center justify-between">
+                      <span className="text-xs text-slate-400 italic">
+                        LangGraph thread paused. Decision will resume workflow to completed state.
+                      </span>
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => onAction(item, 'reject')}
+                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600/20 text-rose-300 border border-rose-500/40 hover:bg-rose-600 hover:text-white transition"
+                        >
+                          ✕ Reject
+                        </button>
+                        <button
+                          onClick={() => onAction(item, 'correct')}
+                          className="px-4 py-2 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow"
+                        >
+                          ✏️ Correct Value
+                        </button>
+                        <button
+                          onClick={() => onAction(item, 'approve')}
+                          className="px-4 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow"
+                        >
+                          ✓ Approve Value
+                        </button>
                       </div>
                     </div>
                   </div>
-
-                  <div className="px-6 py-4 bg-brandDark-950 border-t border-brandDark-border flex items-center justify-end space-x-3">
-                    <button
-                      onClick={() => onAction(item, 'reject')}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600/20 text-rose-300 border border-rose-500/40 hover:bg-rose-600 hover:text-white transition"
-                    >
-                      ✕ Reject
-                    </button>
-                    <button
-                      onClick={() => onAction(item, 'correct')}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow"
-                    >
-                      ✏️ Correct Value
-                    </button>
-                    <button
-                      onClick={() => onAction(item, 'approve')}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow"
-                    >
-                      ✓ Approve Value
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

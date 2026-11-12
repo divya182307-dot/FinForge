@@ -69,11 +69,18 @@ def get_all_companies():
     conn.close()
     return companies
 
-def start_audit_run(ticker: str, period: str = "FY2023") -> Dict[str, Any]:
+def start_audit_run(
+    ticker: str,
+    period: str = "FY2023",
+    custom_extractions: Optional[List[Dict[str, Any]]] = None,
+    company_name: Optional[str] = None,
+    cik: Optional[str] = None,
+    sector: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Initiates an SEC filing audit run:
     1. Creates audit_runs record
-    2. Runs Member 1 extraction
+    2. Runs Member 1 extraction (or accepts uploaded custom filing extractions)
     3. Runs Member 2 accounting validation
     4. Triggers review queue if anomalies or low-confidence metrics exist
     """
@@ -82,26 +89,64 @@ def start_audit_run(ticker: str, period: str = "FY2023") -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
 
-    audit_id = f"aud_{uuid.uuid4().hex[:10]}"
-    thread_id = f"thread_{uuid.uuid4().hex[:8]}"
     now = datetime.now(timezone.utc).isoformat()
 
-    # Get simulated raw extractions for this company & period
-    company_extractions = SIMULATED_EXTRACTIONS.get(ticker, {}).get(period)
-    if not company_extractions:
-        # Fallback to default extraction from COMPANY_FACTS
-        facts = COMPANY_FACTS.get(ticker, {}).get(period, COMPANY_FACTS.get(ticker, {}).get("FY2023", {}))
-        company_extractions = [
-            {
-                "metric_name": k,
-                "extracted_value": v,
-                "unit": "USD Millions",
-                "confidence_score": 0.96,
-                "source_evidence": f"Form 10-K, Item 8 Financial Statements: {k} recorded as ${v:,.1f} million.",
-                "sec_filing_ref": "Form 10-K, Item 8"
-            }
-            for k, v in facts.items()
-        ]
+    # Ensure company exists in companies table
+    cursor.execute("SELECT ticker FROM companies WHERE ticker = ?", (ticker,))
+    if not cursor.fetchone():
+        cursor.execute("""
+        INSERT INTO companies (ticker, name, cik, sector, available_periods, filing_status, current_audit_status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            ticker,
+            company_name or f"{ticker} Corporation",
+            cik or "0009999999",
+            sector or "Corporate Filing Upload",
+            json.dumps([period]),
+            "10-K Uploaded",
+            "Audit Initiated",
+            now
+        ))
+        conn.commit()
+
+    audit_id = f"aud_{uuid.uuid4().hex[:10]}"
+    thread_id = f"thread_{uuid.uuid4().hex[:8]}"
+
+    # Determine extractions
+    if custom_extractions and len(custom_extractions) > 0:
+        company_extractions = []
+        for c_item in custom_extractions:
+            m_name = c_item.get("metric_name") or c_item.get("metric", "Unknown Metric")
+            val = float(c_item.get("extracted_value") or c_item.get("value", 0.0))
+            conf = float(c_item.get("confidence_score") if c_item.get("confidence_score") is not None else (c_item.get("confidence") if c_item.get("confidence") is not None else 0.95))
+            evid = c_item.get("source_evidence") or f"Uploaded Form 10-K statement: {m_name} reported as ${val:,.1f} million."
+            ref = c_item.get("sec_filing_ref") or c_item.get("filing_url") or "Uploaded Filing, Item 8"
+            unit = c_item.get("unit") or "USD Millions"
+            company_extractions.append({
+                "metric_name": m_name,
+                "extracted_value": val,
+                "unit": unit,
+                "confidence_score": conf,
+                "source_evidence": evid,
+                "sec_filing_ref": ref
+            })
+    else:
+        # Get simulated raw extractions for this company & period
+        company_extractions = SIMULATED_EXTRACTIONS.get(ticker, {}).get(period)
+        if not company_extractions:
+            # Fallback to default extraction from COMPANY_FACTS
+            facts = COMPANY_FACTS.get(ticker, {}).get(period, COMPANY_FACTS.get(ticker, {}).get("FY2023", {}))
+            company_extractions = [
+                {
+                    "metric_name": k,
+                    "extracted_value": v,
+                    "unit": "USD Millions",
+                    "confidence_score": 0.96,
+                    "source_evidence": f"Form 10-K, Item 8 Financial Statements: {k} recorded as ${v:,.1f} million.",
+                    "sec_filing_ref": "Form 10-K, Item 8"
+                }
+                for k, v in facts.items()
+            ]
 
     # Insert into audit_runs
     cursor.execute("""
