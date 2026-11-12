@@ -574,7 +574,7 @@
                   onOpenReviewItem={(item, action) => {
                     setActiveReviewItem(item);
                     setReviewAction(action);
-                    setCorrectionVal(action === 'correct' ? item.original_value : '');
+                    setCorrectionVal(action === 'correct' ? (item.expected_value ?? item.original_value) : '');
                   }}
                   onNavigateReview={() => setActiveNav('review')}
                 />
@@ -616,7 +616,7 @@
                   onAction={(item, action) => {
                     setActiveReviewItem(item);
                     setReviewAction(action);
-                    setCorrectionVal(action === 'correct' ? item.original_value : '');
+                    setCorrectionVal(action === 'correct' ? (item.expected_value ?? item.original_value) : '');
                   }}
                   onInspectEvidence={(item) => setEvidenceModalItem(item)}
                 />
@@ -854,6 +854,14 @@
                         ${activeReviewItem.original_value?.toLocaleString()} {activeReviewItem.unit}
                       </span>
                     </div>
+                    {activeReviewItem.expected_value !== null && activeReviewItem.expected_value !== undefined && (
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Expected (SEC XBRL):</span>
+                        <span className="font-mono text-sm font-bold text-accentEmerald">
+                          ${Number(activeReviewItem.expected_value).toLocaleString()} {activeReviewItem.unit}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Confidence Score:</span>
                       <span className="font-mono text-xs text-rose-400 font-bold">
@@ -1733,6 +1741,11 @@
                       <div className="text-2xl font-extrabold font-mono text-accentAmber mt-2">
                         ${item.original_value.toLocaleString()} <span className="text-xs text-slate-400">{item.unit}</span>
                       </div>
+                      {item.expected_value !== null && item.expected_value !== undefined && (
+                        <div className="text-xs font-mono text-accentEmerald font-bold mt-1">
+                          Expected (XBRL): ${Number(item.expected_value).toLocaleString()} {item.unit}
+                        </div>
+                      )}
                       <div className="text-xs font-mono text-accentRose font-bold mt-1">
                         Confidence: {(item.confidence_score * 100).toFixed(0)}%
                       </div>

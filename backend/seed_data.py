@@ -157,10 +157,14 @@ COMPANY_FACTS = {
         },
         "FY2023": {
             "Revenue": 26974.0,
+            "Cost of Goods Sold": 11618.0,
+            "Gross Profit": 15356.0,
+            "Operating Income": 4224.0,
             "Net Income": 4368.0,
             "Total Assets": 41182.0,
             "Total Liabilities": 19081.0,
-            "Shareholders' Equity": 22101.0
+            "Shareholders' Equity": 22101.0,
+            "Operating Cash Flow": 5641.0
         }
     }
 }
@@ -448,6 +452,74 @@ SIMULATED_EXTRACTIONS = {
         ]
     },
     "NVDA": {
+        "FY2023": [
+            {
+                "metric_name": "Revenue",
+                "extracted_value": 26974.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.99,
+                "source_evidence": "Consolidated Statements of Income: Revenue was $26,974 million for fiscal year 2023.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 47"
+            },
+            {
+                "metric_name": "Net Income",
+                "extracted_value": 4368.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Statements of Income: Net income was $4,368 million.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 47"
+            },
+            {
+                "metric_name": "Total Assets",
+                # INTENTIONAL MISTAKE / OCR DISCREPANCY FOR HUMAN ESCALATION DEMO:
+                # Extracted as 45,182 instead of 41,182 (discrepancy of $4,000M against Liabilities + Equity)
+                "extracted_value": 45182.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.62,
+                "source_evidence": "Consolidated Balance Sheets: Total assets recorded as [OCR Discrepancy] $45,182 million (violates Liabilities + Equity = $41,182 million).",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 49"
+            },
+            {
+                "metric_name": "Total Liabilities",
+                "extracted_value": 19081.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Balance Sheets: Total liabilities recorded at $19,081 million.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 49"
+            },
+            {
+                "metric_name": "Shareholders' Equity",
+                "extracted_value": 22101.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Balance Sheets: Total shareholders' equity recorded at $22,101 million.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 49"
+            },
+            {
+                "metric_name": "Operating Cash Flow",
+                "extracted_value": 5641.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Consolidated Statements of Cash Flows: Net cash from operating activities was $5,641 million.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 51"
+            },
+            {
+                "metric_name": "Gross Profit",
+                "extracted_value": 15356.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.97,
+                "source_evidence": "Gross profit was $15,356 million for fiscal year 2023.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 47"
+            },
+            {
+                "metric_name": "Operating Income",
+                "extracted_value": 4224.0,
+                "unit": "USD Millions",
+                "confidence_score": 0.98,
+                "source_evidence": "Operating income was $4,224 million for fiscal year 2023.",
+                "sec_filing_ref": "Form 10-K, Item 8, Page 47"
+            }
+        ],
         "FY2024": [
             {
                 "metric_name": "Revenue",

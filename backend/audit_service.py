@@ -213,14 +213,20 @@ def start_audit_run(ticker: str, period: str = "FY2023") -> Dict[str, Any]:
 
     # Check for items requiring Human Escalation:
     # 1. Low confidence score (< 0.85)
-    # 2. Equation discrepancy
-    # 3. Known anomalies (e.g., NVDA Net Income OCR artifact)
+    # 2. Accounting equation discrepancy (Total Assets != Liabilities + Equity)
+    # 3. Discrepancy against SEC XBRL ground truth facts
     for m_name, m_data in metrics_map.items():
         reasons = []
         if m_data["confidence"] < 0.85:
             reasons.append(f"Confidence score ({m_data['confidence']:.2f}) below autonomous acceptance threshold (0.85)")
-        
-        # Check against ground truth
+
+        # Accounting equation flag for Total Assets
+        if m_name == "Total Assets" and not eq_passed and expected_assets is not None:
+            reasons.append(
+                f"Accounting Equation Mismatch: Total Assets (${assets:,.1f}M) != Liabilities (${liabilities:,.1f}M) + Equity (${equity:,.1f}M) [Discrepancy: ${discrepancy:,.1f}M]"
+            )
+
+        # Check against SEC XBRL ground truth
         facts = COMPANY_FACTS.get(ticker, {}).get(period, {})
         truth_val = facts.get(m_name)
         if truth_val is not None and abs(m_data["value"] - truth_val) > 1.0:
@@ -229,9 +235,11 @@ def start_audit_run(ticker: str, period: str = "FY2023") -> Dict[str, Any]:
         if reasons:
             review_id = f"rev_{uuid.uuid4().hex[:8]}"
             reason_str = " | ".join(reasons)
+            expected_val = truth_val if truth_val is not None else (expected_assets if m_name == "Total Assets" else None)
+
             cursor.execute("""
-            INSERT INTO review_items (review_id, audit_id, metric_id, ticker, metric_name, period, original_value, unit, confidence_score, validation_result, reason, source_evidence, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO review_items (review_id, audit_id, metric_id, ticker, metric_name, period, original_value, expected_value, unit, confidence_score, validation_result, reason, source_evidence, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 review_id,
                 audit_id,
@@ -240,6 +248,7 @@ def start_audit_run(ticker: str, period: str = "FY2023") -> Dict[str, Any]:
                 m_name,
                 period,
                 m_data["value"],
+                expected_val,
                 m_data["unit"],
                 m_data["confidence"],
                 "flagged_for_review",

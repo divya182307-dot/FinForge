@@ -102,6 +102,7 @@ def init_db():
         metric_name TEXT NOT NULL,
         period TEXT NOT NULL,
         original_value REAL NOT NULL,
+        expected_value REAL,
         unit TEXT NOT NULL,
         confidence_score REAL NOT NULL,
         validation_result TEXT NOT NULL,
@@ -189,6 +190,12 @@ def init_db():
         FOREIGN KEY (audit_id) REFERENCES audit_runs(audit_id)
     )
     """)
+
+    # Run safe column migrations for existing databases
+    try:
+        cursor.execute("ALTER TABLE review_items ADD COLUMN expected_value REAL")
+    except Exception:
+        pass
 
     conn.commit()
     conn.close()
