@@ -77,11 +77,46 @@ app.add_middleware(
 # 3. Mount Task 1 SEC EDGAR Router
 app.include_router(sec_router)
 
-# 4. Cold-Start Database Initialization
+# 4. Frontend Single-Page App HTML Resolution
+_FRONTEND_HTML_CACHE: Optional[str] = None
+
+def get_frontend_html() -> str:
+    global _FRONTEND_HTML_CACHE
+    if _FRONTEND_HTML_CACHE is None:
+        candidates = [
+            os.path.join(os.path.dirname(__file__), "index.html"),
+            os.path.join(REPO_ROOT, "index.html"),
+            os.path.join(REPO_ROOT, "frontend", "index.html"),
+            os.path.join(REPO_ROOT, "frontend", "dist", "index.html"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                try:
+                    with open(c, "r", encoding="utf-8") as f:
+                        _FRONTEND_HTML_CACHE = f.read()
+                        break
+                except Exception as e:
+                    logger.warning("Failed to read %s: %s", c, e)
+        if _FRONTEND_HTML_CACHE is None:
+            _FRONTEND_HTML_CACHE = "<h1>FinForge AI Backend Running</h1>"
+    return _FRONTEND_HTML_CACHE
+
+# 5. Cold-Start Database Initialization & Path Normalization Middleware
 _initialized = False
 
 @app.middleware("http")
-async def ensure_db_ready(request: Request, call_next):
+async def vercel_request_pipeline(request: Request, call_next):
+    # A. Strip any Vercel internal script prefix if injected into ASGI path
+    raw_path = request.scope.get("path", "")
+    for prefix in ("/api/index.py", "/index.py"):
+        if raw_path.startswith(prefix):
+            remainder = raw_path[len(prefix):]
+            if not remainder.startswith("/"):
+                remainder = "/" + remainder
+            request.scope["path"] = remainder
+            break
+
+    # B. Cold-start DB init
     global _initialized
     if not _initialized:
         try:
@@ -91,6 +126,26 @@ async def ensure_db_ready(request: Request, call_next):
         except Exception as e:
             logger.error("Database cold-start initialization error: %s", e)
     return await call_next(request)
+
+
+# ==========================================
+# Frontend SPA & Root Endpoints
+# ==========================================
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+@app.get("/app", response_class=HTMLResponse)
+def serve_frontend():
+    """Serves the FinForge AI React single-page application dashboard."""
+    return HTMLResponse(content=get_frontend_html(), status_code=200)
+
+@app.get("/health")
+def root_health():
+    return {"status": "healthy", "service": "FinForge AI", "deployment": "Vercel Serverless"}
+
+@app.get("/companies")
+def root_companies():
+    return get_all_companies()
 
 
 # ==========================================
@@ -280,4 +335,17 @@ def api_integrity(audit_id: str):
 def api_live_monitoring(audit_id: str):
     """Feature 12: Live 9-Stage Telemetry Monitoring"""
     return get_live_audit_monitoring(audit_id)
+
+
+# ==========================================
+# SPA Catch-All Client Routing
+# ==========================================
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+def spa_client_fallback(full_path: str):
+    """Fallback handler for React SPA client-side routes, avoiding 404s."""
+    if full_path.startswith("api/") or full_path == "api":
+        raise HTTPException(status_code=404, detail=f"API endpoint '/{full_path}' not found")
+    return HTMLResponse(content=get_frontend_html(), status_code=200)
+
 
