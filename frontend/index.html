@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinForge AI — Human-in-the-Loop Financial Filing Auditor</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brandDark: {
+              950: '#070b14',
+              900: '#0c1220',
+              850: '#10182b',
+              800: '#162036',
+              700: '#223254',
+              border: '#1a2642',
+            },
+            accentCyan: '#06b6d4',
+            accentEmerald: '#00d084',
+            accentBlue: '#2563eb',
+            accentPurple: '#8b5cf6',
+            accentAmber: '#f59e0b',
+            accentRose: '#f43f5e'
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- React & ReactDOM CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #070b14;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Sleek card glow effects matching screenshot */
+    .glow-card {
+      background: linear-gradient(180deg, rgba(16, 24, 43, 0.85) 0%, rgba(12, 18, 32, 0.95) 100%);
+      border: 1px solid #1a2642;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+    }
+    .glow-card:hover {
+      border-color: rgba(6, 182, 212, 0.35);
+    }
+    .active-nav-pill {
+      background: linear-gradient(90deg, rgba(6, 182, 212, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      color: #38bdf8;
+      box-shadow: 0 0 15px -3px rgba(6, 182, 212, 0.25);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #070b14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1a2642;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #223254;
+    }
+  </style>
+</head>
+<body class="bg-brandDark-950 text-slate-100 antialiased min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Toast Alert Component
+    function Toast({ notification, onClose }) {
+      if (!notification) return null;
+      const isError = notification.type === 'error';
+      return (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md transition-all ${
+          isError ? 'bg-rose-950/90 border-rose-500/50 text-rose-200' : 'bg-brandDark-900/95 border-emerald-500/50 text-emerald-300'
+        }`}>
+          <div className="mr-3 font-semibold text-lg">{isError ? '✕' : '✓'}</div>
+          <div className="text-sm font-medium">{notification.message}</div>
+          <button onClick={onClose} className="ml-4 text-slate-400 hover:text-white">✕</button>
+        </div>
+      );
+    }
+
+    // Mini Sparkline SVG Component (Exact match to screenshot)
+    function Sparkline({ color, points }) {
+      return (
+        <svg className="w-20 h-7 overflow-visible" viewBox="0 0 80 28" fill="none">
+          <path
+            d={points}
+            stroke={color}
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    }
+
+    // Donut Chart SVG Component
+    function DonutChart({ high = 72.8, med = 20.1, low = 7.1, totalLabel = "2,184" }) {
+      const C = 238.76;
+      const highStroke = (high / 100) * C;
+      const medStroke = (med / 100) * C;
+      const lowStroke = (low / 100) * C;
+
+      const medOffset = -highStroke;
+      const lowOffset = -(highStroke + medStroke);
+
+      return (
+        <div className="relative w-36 h-36 flex items-center justify-center">
+          <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" stroke="#162036" strokeWidth="12" fill="none" />
+            <circle
+              cx="50" cy="50" r="38"
+              stroke="#00d084"
+              strokeWidth="12"
+              fill="none"
+              strokeDasharray={`${highStroke} ${C}`}
+              strokeDashoffset="0"
+              strokeLinecap="round"
+            />
+            <circle
+              cx="50" cy="50" r="38"
+              stroke="#0ea5e9"
+              strokeWidth="12"
+              fill="none"
+              strokeDasharray={`${medStroke} ${C}`}
+              strokeDashoffset={medOffset}
+            />
+            <circle
+              cx="50" cy="50" r="38"
+              stroke="#f59e0b"
+              strokeWidth="12"
+              fill="none"
+              strokeDasharray={`${lowStroke} ${C}`}
+              strokeDashoffset={lowOffset}
+            />
+          </svg>
+          <div className="absolute flex flex-col items-center justify-center text-center">
+            <span className="text-base font-bold font-mono text-white leading-tight">{totalLabel}</span>
+            <span className="text-[10px] text-slate-400 font-sans tracking-tight">Metrics</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Multi-Bar Financial Performance Chart Component
+    function PerformanceChart({ ticker = 'AAPL' }) {
+      const data = [
+        { year: '2020', rev: 274, net: 57, ocf: 80 },
+        { year: '2021', rev: 365, net: 94, ocf: 104 },
+        { year: '2022', rev: 394, net: 99, ocf: 122 },
+        { year: '2023', rev: 383, net: 96, ocf: 110 },
+        { year: '2024', rev: 410, net: 102, ocf: 118 },
+      ];
+      const maxVal = 500;
+
+      return (
+        <div className="pt-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-mono">
+            <span>500B</span>
+          </div>
+          <div className="h-44 flex items-end justify-between px-2 pt-2 border-b border-brandDark-700/60 pb-2 relative">
+            <div className="absolute inset-x-0 top-0 border-b border-brandDark-800/40 pointer-events-none"></div>
+            <div className="absolute inset-x-0 top-1/4 border-b border-brandDark-800/40 pointer-events-none"></div>
+            <div className="absolute inset-x-0 top-2/4 border-b border-brandDark-800/40 pointer-events-none"></div>
+            <div className="absolute inset-x-0 top-3/4 border-b border-brandDark-800/40 pointer-events-none"></div>
+
+            {data.map(d => {
+              const hRev = (d.rev / maxVal) * 100;
+              const hNet = (d.net / maxVal) * 100;
+              const hOcf = (d.ocf / maxVal) * 100;
+              return (
+                <div key={d.year} className="flex flex-col items-center space-y-2 z-10 group">
+                  <div className="flex items-end space-x-1.5 h-36">
+                    <div
+                      style={{ height: `${hRev}%` }}
+                      className="w-3 rounded-t bg-gradient-to-t from-emerald-600 to-accentEmerald transition-all hover:brightness-125"
+                      title={`Revenue: $${d.rev}B`}
+                    ></div>
+                    <div
+                      style={{ height: `${hNet}%` }}
+                      className="w-3 rounded-t bg-gradient-to-t from-blue-600 to-sky-400 transition-all hover:brightness-125"
+                      title={`Net Income: $${d.net}B`}
+                    ></div>
+                    <div
+                      style={{ height: `${hOcf}%` }}
+                      className="w-3 rounded-t bg-gradient-to-t from-indigo-600 to-accentPurple transition-all hover:brightness-125"
+                      title={`Operating Cash Flow: $${d.ocf}B`}
+                    ></div>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400 group-hover:text-white transition">
+                    {d.year}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-1">
+            <span>0B</span>
+            <span>Scale: USD Billions</span>
+          </div>
+        </div>
+      );
+    }
+
+    // MAIN APPLICATION CONTAINER
+    function App() {
+      const [activeNav, setActiveNav] = useState('overview');
+      const [companies, setCompanies] = useState([]);
+      const [audits, setAudits] = useState([]);
+      const [selectedAuditId, setSelectedAuditId] = useState('');
+      const [auditDetails, setAuditDetails] = useState(null);
+      const [pendingReviews, setPendingReviews] = useState([]);
+      const [summary, setSummary] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [toast, setToast] = useState(null);
+
+      const [isStartAuditOpen, setIsStartAuditOpen] = useState(false);
+      const [launchTicker, setLaunchTicker] = useState('AAPL');
+      const [launchPeriod, setLaunchPeriod] = useState('FY2023');
+
+      const [activeReviewItem, setActiveReviewItem] = useState(null);
+      const [reviewAction, setReviewAction] = useState(null);
+      const [correctionVal, setCorrectionVal] = useState('');
+      const [actionReason, setActionReason] = useState('');
+      const [actionComments, setActionComments] = useState('');
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4500);
+      };
+
+      const loadData = async () => {
+        try {
+          const [compRes, audRes, sumRes, revRes] = await Promise.all([
+            fetch('/api/companies').then(r => r.json()),
+            fetch('/api/audits').then(r => r.json()),
+            fetch('/api/dashboard/summary').then(r => r.json()),
+            fetch('/api/reviews').then(r => r.json())
+          ]);
+          setCompanies(compRes || []);
+          setAudits(audRes || []);
+          setSummary(sumRes || null);
+          setPendingReviews(revRes || []);
+          if (audRes && audRes.length > 0 && !selectedAuditId) {
+            setSelectedAuditId(audRes[0].audit_id);
+          }
+        } catch (err) {
+          console.error("Data load failed", err);
+        }
+      };
+
+      useEffect(() => {
+        loadData();
+      }, []);
+
+      useEffect(() => {
+        if (selectedAuditId) {
+          fetch(`/api/audit/${selectedAuditId}`)
+            .then(r => r.json())
+            .then(setAuditDetails)
+            .catch(console.error);
+        }
+      }, [selectedAuditId]);
+
+      const handleStartAudit = async () => {
+        setLoading(true);
+        try {
+          const res = await fetch('/api/audit/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker: launchTicker, period: launchPeriod })
+          });
+          const result = await res.json();
+          if (res.ok) {
+            showToast(`Audit initiated for ${launchTicker} (${result.audit_id}). Status: ${result.status}`);
+            setIsStartAuditOpen(false);
+            await loadData();
+            setSelectedAuditId(result.audit_id);
+          } else {
+            showToast(result.error || 'Audit initiation failed', 'error');
+          }
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleReviewDecision = async () => {
+        if (!activeReviewItem || !reviewAction) return;
+        setLoading(true);
+
+        const payload = {
+          decision: reviewAction,
+          corrected_value: reviewAction === 'correct' ? parseFloat(correctionVal) : null,
+          reason: actionReason || `Reviewer ${reviewAction} action confirmed`,
+          comments: actionComments
+        };
+
+        if (reviewAction === 'correct' && (isNaN(payload.corrected_value) || payload.corrected_value <= 0)) {
+          showToast("Please enter a valid numeric value", "error");
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/reviews/${activeReviewItem.review_id}/decision`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (res.ok) {
+            showToast(`Success! Decision '${reviewAction.toUpperCase()}' processed. LangGraph resumed: ${result.workflow_status}`);
+            setActiveReviewItem(null);
+            setReviewAction(null);
+            setCorrectionVal('');
+            setActionReason('');
+            setActionComments('');
+            await loadData();
+            if (selectedAuditId) {
+              const freshDetails = await fetch(`/api/audit/${selectedAuditId}`).then(r => r.json());
+              setAuditDetails(freshDetails);
+            }
+          } else {
+            showToast(result.error || 'Review decision failed', 'error');
+          }
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const navItems = [
+        { id: 'overview', label: 'Overview', icon: '🏠' },
+        { id: 'filing_analysis', label: 'Filing Analysis', icon: '📄' },
+        { id: 'metrics', label: 'Financial Metrics', icon: '📊' },
+        { id: 'anomaly', label: 'Anomaly Detection', icon: '⚠️' },
+        { id: 'review', label: 'Human Review', icon: '👤', badge: pendingReviews.length },
+        { id: 'reports', label: 'Validation Reports', icon: '🛡️' },
+        { id: 'history', label: 'Audit History', icon: '🕒' },
+        { id: 'settings', label: 'Settings', icon: '⚙️' },
+      ];
+
+      return (
+        <div className="flex h-screen bg-brandDark-950 overflow-hidden text-slate-200">
+          <Toast notification={toast} onClose={() => setToast(null)} />
+
+          {/* LEFT SIDEBAR (EXACT SCREENSHOT DESIGN) */}
+          <aside className="w-64 bg-brandDark-950 border-r border-brandDark-border flex flex-col justify-between py-5 px-4 z-20">
+            <div>
+              {/* Logo / Product Name */}
+              <div className="flex items-center space-x-2.5 px-3 mb-7">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-accentCyan to-accentEmerald flex items-center justify-center font-bold text-brandDark-950 text-sm shadow-md shadow-accentCyan/20">
+                  F
+                </div>
+                <h1 className="text-base font-extrabold tracking-wide text-white">
+                  FINFORGE <span className="text-accentCyan font-bold">AI</span>
+                </h1>
+              </div>
+
+              {/* Navigation Links */}
+              <nav className="space-y-1">
+                {navItems.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveNav(item.id)}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                      activeNav === item.id
+                        ? 'active-nav-pill font-semibold'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-brandDark-900/60'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge > 0 && (
+                      <span className="h-5 min-w-[20px] px-1.5 flex items-center justify-center bg-accentRose text-white font-mono text-[10px] font-bold rounded-full shadow-sm shadow-accentRose/50">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* AI Audit Engine Status Card in Sidebar Footer */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-b from-brandDark-850 to-brandDark-900 border border-brandDark-border">
+              <div className="flex items-center space-x-2.5 mb-1.5">
+                <div className="w-6 h-6 rounded-md bg-accentCyan/15 border border-accentCyan/30 flex items-center justify-center text-accentCyan text-xs">
+                  ⚙️
+                </div>
+                <h4 className="text-xs font-semibold text-white">AI Audit Engine</h4>
+              </div>
+              <p className="text-[10px] text-slate-400">Extract · Validate · Detect · Review</p>
+              <div className="mt-2.5 pt-2 border-t border-brandDark-700/40 flex items-center space-x-2">
+                <span className="h-2 w-2 rounded-full bg-accentEmerald animate-pulse"></span>
+                <span className="text-[11px] font-medium text-accentEmerald">Workflow Active</span>
+              </div>
+            </div>
+          </aside>
+
+          {/* MAIN CONTAINER */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-brandDark-950">
+            {/* TOP BAR (EXACT SCREENSHOT) */}
+            <header className="h-16 border-b border-brandDark-border px-8 flex items-center justify-between bg-brandDark-950/80 backdrop-blur sticky top-0 z-10">
+              <div className="relative w-96">
+                <span className="absolute left-3.5 top-2.5 text-slate-500 text-xs">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search company, ticker or audit ID..."
+                  className="w-full bg-brandDark-900 border border-brandDark-border rounded-xl pl-9 pr-12 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accentCyan transition"
+                />
+                <span className="absolute right-3 top-2 px-1.5 py-0.5 rounded bg-brandDark-800 text-[10px] font-mono text-slate-400 border border-brandDark-700">
+                  ⌘K
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <button className="relative p-2 text-slate-400 hover:text-white rounded-lg hover:bg-brandDark-900 transition">
+                  <span className="text-sm">🔔</span>
+                  {pendingReviews.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-accentCyan"></span>
+                  )}
+                </button>
+                <div className="flex items-center p-1 rounded-full bg-brandDark-900 border border-brandDark-border">
+                  <span className="p-1 rounded-full text-slate-400 text-xs">☀️</span>
+                  <span className="p-1 rounded-full bg-brandDark-700 text-white text-xs">🌙</span>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-accentCyan to-accentBlue flex items-center justify-center text-xs font-bold text-white shadow-md shadow-accentCyan/20">
+                  FA
+                </div>
+              </div>
+            </header>
+
+            {/* SCROLLABLE MAIN VIEW AREA */}
+            <main className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white tracking-tight">Audit Dashboard</h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    AI-powered financial filing auditing with human accountability
+                  </p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="px-3 py-1.5 rounded-lg bg-brandDark-900 border border-brandDark-border text-xs text-slate-300 font-mono flex items-center space-x-1.5">
+                    <span>👤</span>
+                    <span>Sample Data · For Demonstration Only</span>
+                  </span>
+                  <button
+                    onClick={() => setIsStartAuditOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 text-xs font-bold flex items-center space-x-1.5 shadow-lg shadow-accentEmerald/20 transition-all"
+                  >
+                    <span className="text-sm font-extrabold">+</span>
+                    <span>Start New Audit</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ROUTED CONTENT VIEWS */}
+              {activeNav === 'overview' && (
+                <OverviewView
+                  summary={summary}
+                  audits={audits}
+                  pendingReviews={pendingReviews}
+                  onOpenReviewItem={(item, action) => {
+                    setActiveReviewItem(item);
+                    setReviewAction(action);
+                    setCorrectionVal(action === 'correct' ? item.original_value : '');
+                  }}
+                  onNavigateReview={() => setActiveNav('review')}
+                />
+              )}
+
+              {activeNav === 'filing_analysis' && (
+                <FilingAnalysisView
+                  companies={companies}
+                  onRun={(ticker, period) => {
+                    setLaunchTicker(ticker);
+                    setLaunchPeriod(period);
+                    setIsStartAuditOpen(true);
+                  }}
+                />
+              )}
+
+              {activeNav === 'metrics' && (
+                <FinancialMetricsView
+                  auditDetails={auditDetails}
+                  audits={audits}
+                  selectedAuditId={selectedAuditId}
+                  onSelectAudit={setSelectedAuditId}
+                />
+              )}
+
+              {activeNav === 'anomaly' && (
+                <AnomalyDetectionView
+                  auditDetails={auditDetails}
+                />
+              )}
+
+              {activeNav === 'review' && (
+                <HumanReviewQueueView
+                  pendingReviews={pendingReviews}
+                  onAction={(item, action) => {
+                    setActiveReviewItem(item);
+                    setReviewAction(action);
+                    setCorrectionVal(action === 'correct' ? item.original_value : '');
+                  }}
+                />
+              )}
+
+              {activeNav === 'reports' && (
+                <ValidationReportsView
+                  auditDetails={auditDetails}
+                  selectedAuditId={selectedAuditId}
+                />
+              )}
+
+              {activeNav === 'history' && (
+                <AuditHistoryLedgerView
+                  selectedAuditId={selectedAuditId}
+                />
+              )}
+
+              {activeNav === 'settings' && (
+                <SettingsView />
+              )}
+            </main>
+          </div>
+
+          {/* START NEW AUDIT MODAL */}
+          {isStartAuditOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+                <div className="flex items-center justify-between border-b border-brandDark-800 pb-3">
+                  <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                    <span>🚀</span>
+                    <span>Initiate SEC 10-K Audit</span>
+                  </h3>
+                  <button onClick={() => setIsStartAuditOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Select Target Corporation
+                    </label>
+                    <select
+                      value={launchTicker}
+                      onChange={(e) => setLaunchTicker(e.target.value)}
+                      className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-accentCyan font-mono"
+                    >
+                      <option value="AAPL">Apple Inc. (AAPL) - Tech Hardware</option>
+                      <option value="MSFT">Microsoft Corp. (MSFT) - Software & Cloud</option>
+                      <option value="AMZN">Amazon.com Inc. (AMZN) - E-Commerce & AWS</option>
+                      <option value="GOOGL">Alphabet Inc. (GOOGL) - Cloud & Media</option>
+                      <option value="NVDA">NVIDIA Corp. (NVDA) - AI Compute & Semi</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Reporting Period (10-K Filing)
+                    </label>
+                    <select
+                      value={launchPeriod}
+                      onChange={(e) => setLaunchPeriod(e.target.value)}
+                      className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-accentCyan font-mono"
+                    >
+                      <option value="FY2023">FY 2023 (Annual 10-K)</option>
+                      <option value="FY2024">FY 2024 (Annual 10-K - NVDA)</option>
+                      <option value="FY2022">FY 2022 (Historical Comparison)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-3 border-t border-brandDark-800">
+                  <button
+                    onClick={() => setIsStartAuditOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-brandDark-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleStartAudit}
+                    disabled={loading}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow-lg shadow-accentEmerald/20"
+                  >
+                    {loading ? 'Initializing Pipeline...' : 'Run Autonomous Audit'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* HUMAN REVIEW ACTION MODAL (APPROVE / CORRECT / REJECT) */}
+          {reviewAction && activeReviewItem && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+              <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+                <div className={`px-6 py-4 border-b flex items-center justify-between ${
+                  reviewAction === 'approve' ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' :
+                  reviewAction === 'correct' ? 'bg-sky-950/40 border-sky-500/30 text-sky-300' :
+                  'bg-rose-950/40 border-rose-500/30 text-rose-300'
+                }`}>
+                  <h3 className="text-sm font-bold flex items-center space-x-2">
+                    <span>
+                      {reviewAction === 'approve' && '✓ Approve Extracted Metric'}
+                      {reviewAction === 'correct' && '✏️ Correct Financial Metric'}
+                      {reviewAction === 'reject' && '✕ Reject Extracted Metric'}
+                    </span>
+                  </h3>
+                  <button onClick={() => setReviewAction(null)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div className="bg-brandDark-950 p-4 rounded-xl border border-brandDark-border space-y-2">
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Target:</span>
+                      <strong className="text-white">{activeReviewItem.company_name} ({activeReviewItem.ticker} - {activeReviewItem.period})</strong>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Metric:</span>
+                      <strong className="text-white">{activeReviewItem.metric_name}</strong>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Original Extracted Value:</span>
+                      <span className="font-mono text-sm font-bold text-accentAmber">
+                        ${activeReviewItem.original_value?.toLocaleString()} {activeReviewItem.unit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Confidence Score:</span>
+                      <span className="font-mono text-xs text-rose-400 font-bold">
+                        {(activeReviewItem.confidence_score * 100).toFixed(0)}% (Flagged)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-brandDark-850 rounded-xl border border-brandDark-border text-xs text-slate-300">
+                    <span className="font-semibold text-accentAmber block mb-1">Escalation Diagnostic:</span>
+                    <p>{activeReviewItem.reason}</p>
+                  </div>
+
+                  <div className="p-3 bg-brandDark-950 rounded-xl border border-brandDark-border text-xs text-slate-400">
+                    <span className="font-semibold text-slate-300 block mb-1">SEC 10-K Evidence Snippet:</span>
+                    <p className="italic">"{activeReviewItem.source_evidence}"</p>
+                  </div>
+
+                  {reviewAction === 'correct' && (
+                    <div className="space-y-3 pt-1">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                          Corrected Financial Value ({activeReviewItem.unit}) *
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={correctionVal}
+                          onChange={(e) => setCorrectionVal(e.target.value)}
+                          placeholder="e.g. 29760"
+                          className="w-full bg-brandDark-950 border border-accentCyan/50 rounded-xl px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-accentCyan"
+                        />
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          * The original extracted value will be permanently preserved in the append-only audit log.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                          Correction Justification *
+                        </label>
+                        <input
+                          type="text"
+                          value={actionReason}
+                          onChange={(e) => setActionReason(e.target.value)}
+                          placeholder="e.g. Reconciled with SEC EDGAR XBRL Item 8 Statement of Operations"
+                          className="w-full bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-accentCyan"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {reviewAction === 'reject' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        Rejection Justification *
+                      </label>
+                      <input
+                        type="text"
+                        value={actionReason}
+                        onChange={(e) => setActionReason(e.target.value)}
+                        placeholder="e.g. Corrupted OCR segment or disallowed non-GAAP figure"
+                        className="w-full bg-brandDark-950 border border-rose-500/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-rose-400"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="px-6 py-4 bg-brandDark-950 border-t border-brandDark-border flex justify-end space-x-3">
+                  <button
+                    onClick={() => setReviewAction(null)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-brandDark-800 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReviewDecision}
+                    disabled={loading}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl shadow transition ${
+                      reviewAction === 'approve' ? 'bg-accentEmerald text-brandDark-950 hover:bg-[#00b572]' :
+                      reviewAction === 'correct' ? 'bg-accentCyan text-brandDark-950 hover:bg-sky-400' :
+                      'bg-accentRose text-white hover:bg-rose-500'
+                    }`}
+                  >
+                    {loading ? 'Resuming...' : 'Confirm & Resume LangGraph'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 1: OVERVIEW DASHBOARD (EXACT SCREENSHOT)
+    // ==========================================
+    function OverviewView({ summary, audits, pendingReviews, onOpenReviewItem, onNavigateReview }) {
+      const kpis = summary?.kpis || {
+        companies_audited: 27,
+        total_metrics_extracted: 2184,
+        pending_human_reviews: 6,
+        extraction_accuracy_pct: 96.4
+      };
+
+      const flaggedValues = [
+        {
+          id: 'flag_1',
+          company: 'AAPL',
+          metric: 'Total Assets',
+          extracted_value: '$352.76B',
+          confidence: '0.62',
+          reason: 'Balance mismatch',
+          review_id: pendingReviews[0]?.review_id,
+          rawItem: pendingReviews[0]
+        },
+        {
+          id: 'flag_2',
+          company: 'AMZN',
+          metric: 'Operating Income',
+          extracted_value: '$36.28B',
+          confidence: '0.68',
+          reason: 'Unusual variation (+42%)',
+          review_id: pendingReviews[1]?.review_id,
+          rawItem: pendingReviews[1]
+        },
+        {
+          id: 'flag_3',
+          company: 'MSFT',
+          metric: 'R&D Expense',
+          extracted_value: '$27.91B',
+          confidence: '0.66',
+          reason: 'Outside expected range',
+          review_id: pendingReviews[2]?.review_id,
+          rawItem: pendingReviews[2]
+        }
+      ];
+
+      return (
+        <div className="space-y-6">
+          {/* ROW 1: 4 KPI CARDS WITH SPARKLINES (EXACT SCREENSHOT MATCH) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div className="flex items-center space-x-3.5 mb-2">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg">
+                  📄
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Total Filings Analyzed</div>
+                  <div className="text-2xl font-extrabold text-white font-mono mt-0.5">27</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-brandDark-border/60">
+                <span className="text-xs font-bold text-accentEmerald font-mono flex items-center">
+                  ↑ +35% <span className="text-[10px] text-slate-400 font-normal ml-1">vs. previous period</span>
+                </span>
+                <Sparkline color="#38bdf8" points="M0,20 Q20,25 35,12 T60,18 T80,5" />
+              </div>
+            </div>
+
+            <div className="glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div className="flex items-center space-x-3.5 mb-2">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-accentEmerald text-lg">
+                  📑
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Metrics Extracted</div>
+                  <div className="text-2xl font-extrabold text-white font-mono mt-0.5">2,184</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-brandDark-border/60">
+                <span className="text-xs font-bold text-accentEmerald font-mono flex items-center">
+                  ↑ +42% <span className="text-[10px] text-slate-400 font-normal ml-1">vs. previous period</span>
+                </span>
+                <Sparkline color="#00d084" points="M0,22 Q25,24 40,15 T65,10 T80,4" />
+              </div>
+            </div>
+
+            <div className="glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div className="flex items-center space-x-3.5 mb-2">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-accentRose text-lg">
+                  👤
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Pending Human Reviews</div>
+                  <div className="text-2xl font-extrabold text-white font-mono mt-0.5">
+                    {pendingReviews.length > 0 ? pendingReviews.length : 6}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-brandDark-border/60">
+                <span className="text-xs font-bold text-accentRose font-mono flex items-center">
+                  ↑ +3 <span className="text-[10px] text-slate-400 font-normal ml-1">vs. previous period</span>
+                </span>
+                <Sparkline color="#f43f5e" points="M0,18 Q20,10 40,20 T65,8 T80,14" />
+              </div>
+            </div>
+
+            <div className="glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div className="flex items-center space-x-3.5 mb-2">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-accentCyan text-lg">
+                  🎯
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Extraction Accuracy</div>
+                  <div className="text-2xl font-extrabold text-white font-mono mt-0.5">96.4%</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-brandDark-border/60">
+                <span className="text-xs font-bold text-accentEmerald font-mono flex items-center">
+                  ↑ +1.8 pp <span className="text-[10px] text-slate-400 font-normal ml-1">vs. previous period</span>
+                </span>
+                <Sparkline color="#2dd4bf" points="M0,24 Q25,18 45,15 T65,7 T80,2" />
+              </div>
+            </div>
+          </div>
+
+          {/* ROW 2: 3 CARDS */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-6 glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-sm font-bold text-white">Financial Performance</h3>
+                    <span className="text-xs text-slate-500">(Sample Data)</span>
+                  </div>
+                  <select className="bg-brandDark-900 border border-brandDark-border rounded-lg px-2 py-1 text-xs font-mono text-slate-300 focus:outline-none">
+                    <option value="AAPL">AAPL ⌄</option>
+                    <option value="MSFT">MSFT ⌄</option>
+                    <option value="AMZN">AMZN ⌄</option>
+                    <option value="GOOGL">GOOGL ⌄</option>
+                    <option value="NVDA">NVDA ⌄</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center space-x-4 text-xs font-medium text-slate-400 mb-2">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-accentEmerald"></span>
+                    <span>Revenue</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-sky-400"></span>
+                    <span>Net Income</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-accentPurple"></span>
+                    <span>Operating Cash Flow</span>
+                  </div>
+                </div>
+
+                <PerformanceChart ticker="AAPL" />
+              </div>
+            </div>
+
+            <div className="lg:col-span-3 glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white mb-3">Confidence Distribution</h3>
+                <div className="flex justify-center my-3">
+                  <DonutChart high={72.8} med={20.1} low={7.1} totalLabel="2,184" />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-brandDark-border/60 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-slate-300">
+                    <span className="h-2 w-2 rounded-full bg-accentEmerald"></span>
+                    <span>High (≥ 0.90)</span>
+                  </div>
+                  <span className="font-mono font-bold text-white">72.8%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-slate-300">
+                    <span className="h-2 w-2 rounded-full bg-sky-400"></span>
+                    <span>Medium (0.70 – 0.89)</span>
+                  </div>
+                  <span className="font-mono font-bold text-white">20.1%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-slate-300">
+                    <span className="h-2 w-2 rounded-full bg-accentAmber"></span>
+                    <span>Low (&lt; 0.70)</span>
+                  </div>
+                  <span className="font-mono font-bold text-white">7.1%</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-3 glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2 text-white font-bold text-sm">
+                    <span className="text-accentCyan">⚙️</span>
+                    <span>Workflow Status</span>
+                  </div>
+                  <button onClick={onNavigateReview} className="text-slate-400 hover:text-white text-xs">➔</button>
+                </div>
+
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-brandDark-900/60 border border-brandDark-border">
+                    <div className="flex items-center space-x-2.5 text-xs text-slate-300">
+                      <span className="text-accentEmerald text-sm">▶</span>
+                      <span>Running</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-white">4 audits</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-accentAmber/10 border border-accentAmber/30">
+                    <div className="flex items-center space-x-2.5 text-xs text-accentAmber font-medium">
+                      <span className="text-sm">⏸</span>
+                      <span>Paused (Human Review)</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-accentAmber">6 audits</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-brandDark-900/60 border border-brandDark-border">
+                    <div className="flex items-center space-x-2.5 text-xs text-slate-300">
+                      <span className="text-accentCyan text-sm">✓</span>
+                      <span>Completed</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-white">17 audits</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-brandDark-900/60 border border-brandDark-border">
+                    <div className="flex items-center space-x-2.5 text-xs text-slate-300">
+                      <span className="text-accentRose text-sm">✕</span>
+                      <span>Failed</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-slate-400">0 audits</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ROW 3: 3 CARDS */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-5 glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-accentAmber text-base">⚠️</span>
+                    <h3 className="text-sm font-bold text-white">Flagged Financial Values</h3>
+                    <span className="text-xs text-slate-500">(Needs Review)</span>
+                  </div>
+                  <button onClick={onNavigateReview} className="text-xs text-sky-400 hover:underline">
+                    View All →
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="text-slate-400 text-[11px] border-b border-brandDark-border uppercase font-mono">
+                      <tr>
+                        <th className="py-2">Company</th>
+                        <th className="py-2">Metric</th>
+                        <th className="py-2">Extracted Value</th>
+                        <th className="py-2">Confidence</th>
+                        <th className="py-2">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brandDark-border text-slate-300">
+                      {flaggedValues.map(row => (
+                        <tr
+                          key={row.id}
+                          className="hover:bg-brandDark-900/50 cursor-pointer"
+                          onClick={() => {
+                            if (row.rawItem) {
+                              onOpenReviewItem(row.rawItem, 'correct');
+                            } else {
+                              onNavigateReview();
+                            }
+                          }}
+                        >
+                          <td className="py-2.5 font-bold font-mono text-white">{row.company}</td>
+                          <td className="py-2.5 text-slate-200">{row.metric}</td>
+                          <td className="py-2.5 font-mono text-white font-bold">{row.extracted_value}</td>
+                          <td className="py-2.5">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                              {row.confidence}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-[11px] text-slate-400">{row.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-accentCyan text-sm">🕒</span>
+                    <h3 className="text-sm font-bold text-white">Recent Audit Activity</h3>
+                  </div>
+                  <button onClick={onNavigateReview} className="text-xs text-sky-400 hover:underline">
+                    View All →
+                  </button>
+                </div>
+
+                <div className="space-y-3.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+                      <span className="text-slate-300 font-medium">AAPL 10-K audit paused for human review</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">2 min ago</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="h-2 w-2 rounded-full bg-accentEmerald"></span>
+                      <span className="text-slate-300 font-medium">MSFT validation completed</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">8 min ago</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="h-2 w-2 rounded-full bg-sky-400"></span>
+                      <span className="text-slate-300 font-medium">AMZN financial metrics extracted</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">12 min ago</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                      <span className="text-slate-300 font-medium">GOOGL audit started</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">18 min ago</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-3 glow-card rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-accentCyan text-sm">📋</span>
+                    <h3 className="text-sm font-bold text-white">Company Filing History</h3>
+                  </div>
+                  <span className="text-slate-400 text-xs">➔</span>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    { ticker: 'AAPL', logo: '🍎', period: '10-K · FY 2024', status: 'Completed', color: 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' },
+                    { ticker: 'MSFT', logo: '🪟', period: '10-K · FY 2024', status: 'Completed', color: 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' },
+                    { ticker: 'AMZN', logo: '📦', period: '10-K · FY 2024', status: 'In Review', color: 'bg-amber-500/20 text-accentAmber border-amber-500/40' },
+                    { ticker: 'GOOGL', logo: '🔍', period: '10-K · FY 2024', status: 'Completed', color: 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' },
+                    { ticker: 'NVDA', logo: '🟢', period: '10-K · FY 2024', status: 'In Review', color: 'bg-amber-500/20 text-accentAmber border-amber-500/40' }
+                  ].map(c => (
+                    <div key={c.ticker} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center space-x-2">
+                        <span>{c.logo}</span>
+                        <strong className="text-white font-mono">{c.ticker}</strong>
+                        <span className="text-[11px] text-slate-400">{c.period}</span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${c.color}`}>
+                        {c.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 2: FILING ANALYSIS (COMPANY SELECTOR)
+    // ==========================================
+    function FilingAnalysisView({ companies, onRun }) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-bold text-white">Filing Analysis & Retrieval Engine</h3>
+            <p className="text-xs text-slate-400 mt-1">Select an SEC registered public corporation to initiate 10-K extraction.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {companies.map(c => (
+              <div key={c.ticker} className="glow-card rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg font-bold font-mono text-white bg-brandDark-900 px-3 py-1 rounded-xl border border-brandDark-border">
+                      {c.ticker}
+                    </span>
+                    <span className="text-xs font-mono text-accentEmerald bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                      {c.filing_status}
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-white">{c.name}</h4>
+                  <p className="text-xs text-slate-400 mt-1">{c.sector}</p>
+                  <p className="text-[11px] font-mono text-slate-500 mt-1">SEC CIK: {c.cik}</p>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-brandDark-border/60">
+                  <button
+                    onClick={() => onRun(c.ticker, 'FY2023')}
+                    className="w-full py-2.5 px-4 bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 font-bold text-xs rounded-xl shadow transition"
+                  >
+                    🚀 Start 10-K Audit
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 3: FINANCIAL METRICS (EXTRACTION VIEW)
+    // ==========================================
+    function FinancialMetricsView({ auditDetails, audits, selectedAuditId, onSelectAudit }) {
+      const [search, setSearch] = useState('');
+      const metrics = auditDetails?.metrics || [];
+
+      const filtered = metrics.filter(m => m.metric_name.toLowerCase().includes(search.toLowerCase()));
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-white">Extracted Financial Metrics</h3>
+              <p className="text-xs text-slate-400 mt-1">Directly extracted from SEC Form 10-K statements with evidence citations.</p>
+            </div>
+            <select
+              value={selectedAuditId}
+              onChange={(e) => onSelectAudit(e.target.value)}
+              className="bg-brandDark-900 border border-brandDark-border rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200"
+            >
+              {audits.map(a => (
+                <option key={a.audit_id} value={a.audit_id}>{a.ticker} ({a.period}) - {a.audit_id}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="glow-card rounded-2xl p-4">
+            <input
+              type="text"
+              placeholder="Search extracted metrics..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full md:w-80 bg-brandDark-950 border border-brandDark-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-accentCyan"
+            />
+          </div>
+
+          <div className="glow-card rounded-2xl overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-brandDark-900 text-slate-400 uppercase font-mono text-[11px] border-b border-brandDark-border">
+                <tr>
+                  <th className="px-6 py-3.5">Metric Name</th>
+                  <th className="px-6 py-3.5">Extracted Value</th>
+                  <th className="px-6 py-3.5">Confidence</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">SEC 10-K Reference</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brandDark-border text-slate-300">
+                {filtered.map(m => (
+                  <tr key={m.metric_id} className="hover:bg-brandDark-900/50">
+                    <td className="px-6 py-4 font-semibold text-white">{m.metric_name}</td>
+                    <td className="px-6 py-4 font-mono font-bold text-slate-100">${m.extracted_value.toLocaleString()} {m.unit}</td>
+                    <td className="px-6 py-4 font-mono">
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                        m.confidence_score >= 0.85 ? 'text-accentEmerald bg-emerald-500/10' : 'text-accentRose bg-rose-500/10'
+                      }`}>
+                        {(m.confidence_score * 100).toFixed(0)}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                        m.validation_status === 'passed' ? 'bg-emerald-500/20 text-accentEmerald' : 'bg-rose-500/20 text-accentRose'
+                      }`}>
+                        {m.validation_status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-mono text-slate-400">{m.sec_filing_ref}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 4: ANOMALY DETECTION (VALIDATION VIEW)
+    // ==========================================
+    function AnomalyDetectionView({ auditDetails }) {
+      const validations = auditDetails?.validations || [];
+      const eqVal = validations.find(v => v.rule_name === 'accounting_equation');
+      const eqDetails = eqVal?.details || {};
+
+      return (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-bold text-white">Financial Anomaly & Accounting Validation</h3>
+            <p className="text-xs text-slate-400 mt-1">Deterministic balance sheet equation and cross-statement checks.</p>
+          </div>
+
+          <div className="glow-card rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-mono uppercase text-slate-400">Deterministic Balance Rule</span>
+                <h4 className="text-base font-bold text-white mt-0.5">Total Assets = Total Liabilities + Shareholders' Equity</h4>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
+                eqVal?.status === 'passed' ? 'bg-emerald-500/20 text-accentEmerald border-emerald-500/40' : 'bg-rose-500/20 text-accentRose border-rose-500/40'
+              }`}>
+                {eqVal?.status === 'passed' ? 'EQUATION BALANCED (PASSED)' : 'IMBALANCE DETECTED (FAILED)'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div className="p-4 rounded-xl bg-brandDark-950 border border-brandDark-border">
+                <span className="text-xs text-slate-400">Total Assets (A)</span>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  ${eqDetails.assets ? eqDetails.assets.toLocaleString() : '—'}M
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-brandDark-950 border border-brandDark-border">
+                <span className="text-xs text-slate-400">Total Liabilities (L)</span>
+                <div className="text-xl font-bold font-mono text-slate-300 mt-1">
+                  ${eqDetails.liabilities ? eqDetails.liabilities.toLocaleString() : '—'}M
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-brandDark-950 border border-brandDark-border">
+                <span className="text-xs text-slate-400">Shareholders' Equity (E)</span>
+                <div className="text-xl font-bold font-mono text-slate-300 mt-1">
+                  ${eqDetails.equity ? eqDetails.equity.toLocaleString() : '—'}M
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 5: HUMAN REVIEW QUEUE
+    // ==========================================
+    function HumanReviewQueueView({ pendingReviews, onAction }) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-white">Human Review Center</h3>
+              <p className="text-xs text-slate-400 mt-1">LangGraph Human-in-the-Loop decision gateway. Review, approve, correct or reject to resume execution.</p>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-accentAmber/20 text-accentAmber border border-accentAmber/40 font-mono text-xs font-bold">
+              {pendingReviews.length} Escalations Pending
+            </span>
+          </div>
+
+          {pendingReviews.length === 0 ? (
+            <div className="glow-card rounded-2xl p-12 text-center">
+              <span className="text-3xl block mb-2">✓</span>
+              <h4 className="text-base font-bold text-white">Review Queue Clear</h4>
+              <p className="text-xs text-slate-400 mt-1">No execution threads are currently paused.</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {pendingReviews.map(item => (
+                <div key={item.review_id} className="glow-card rounded-2xl border-accentAmber/40 overflow-hidden shadow-2xl">
+                  <div className="px-6 py-4 bg-brandDark-900 border-b border-brandDark-border flex items-center justify-between">
+                    <div>
+                      <h4 className="text-base font-bold text-white">{item.company_name} ({item.ticker}) — {item.period}</h4>
+                      <span className="text-xs font-mono text-slate-400">Audit ID: {item.audit_id}</span>
+                    </div>
+                    <span className="px-2.5 py-1 text-xs font-mono rounded bg-accentAmber/20 text-accentAmber border border-accentAmber/40">
+                      FLAGGED FOR HUMAN REVIEW
+                    </span>
+                  </div>
+
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <span className="text-xs font-mono text-slate-400 uppercase">Target Metric</span>
+                      <div className="text-lg font-bold text-white mt-1">{item.metric_name}</div>
+                      <div className="text-2xl font-extrabold font-mono text-accentAmber mt-2">
+                        ${item.original_value.toLocaleString()} <span className="text-xs text-slate-400">{item.unit}</span>
+                      </div>
+                      <div className="text-xs font-mono text-accentRose font-bold mt-1">
+                        Confidence: {(item.confidence_score * 100).toFixed(0)}%
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 space-y-3">
+                      <div className="p-3.5 rounded-xl bg-brandDark-950 border border-brandDark-border text-xs">
+                        <span className="font-semibold text-accentAmber block mb-1">Escalation Trigger:</span>
+                        <p className="text-slate-200">{item.reason}</p>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-brandDark-950 border border-brandDark-border text-xs">
+                        <span className="font-semibold text-slate-300 block mb-1">SEC 10-K Evidence:</span>
+                        <p className="italic text-slate-400">"{item.source_evidence}"</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-6 py-4 bg-brandDark-950 border-t border-brandDark-border flex items-center justify-end space-x-3">
+                    <button
+                      onClick={() => onAction(item, 'reject')}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600/20 text-rose-300 border border-rose-500/40 hover:bg-rose-600 hover:text-white transition"
+                    >
+                      ✕ Reject
+                    </button>
+                    <button
+                      onClick={() => onAction(item, 'correct')}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-accentCyan text-brandDark-950 hover:bg-sky-400 transition shadow"
+                    >
+                      ✏️ Correct Value
+                    </button>
+                    <button
+                      onClick={() => onAction(item, 'approve')}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-accentEmerald text-brandDark-950 hover:bg-[#00b572] transition shadow"
+                    >
+                      ✓ Approve Value
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 6: VALIDATION REPORTS (XBRL REPORT)
+    // ==========================================
+    function ValidationReportsView({ selectedAuditId }) {
+      const [report, setReport] = useState(null);
+
+      useEffect(() => {
+        if (selectedAuditId) {
+          fetch(`/api/audit/${selectedAuditId}/report`)
+            .then(r => r.json())
+            .then(setReport)
+            .catch(console.error);
+        }
+      }, [selectedAuditId]);
+
+      if (!report) return <div className="text-slate-400 text-xs">Select an audit to view report.</div>;
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-white">SEC EDGAR XBRL Accuracy Report</h3>
+              <p className="text-xs text-slate-400 mt-1">Reconciliation against official SEC EDGAR XBRL Company Facts database.</p>
+            </div>
+            <button onClick={() => window.print()} className="px-3.5 py-1.5 rounded-xl bg-brandDark-900 border border-brandDark-border text-xs text-slate-200">
+              🖨️ Export Certificate
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="glow-card rounded-2xl p-4">
+              <span className="text-xs text-slate-400">Total Audited</span>
+              <div className="text-2xl font-bold font-mono text-white mt-1">{report.total_metrics}</div>
+            </div>
+            <div className="glow-card rounded-2xl p-4">
+              <span className="text-xs text-slate-400">XBRL Verified</span>
+              <div className="text-2xl font-bold font-mono text-accentEmerald mt-1">{report.correct_metrics}</div>
+            </div>
+            <div className="glow-card rounded-2xl p-4">
+              <span className="text-xs text-slate-400">Human Escalations</span>
+              <div className="text-2xl font-bold font-mono text-accentAmber mt-1">{report.escalated_count}</div>
+            </div>
+            <div className="glow-card rounded-2xl p-4">
+              <span className="text-xs text-slate-400">Verified Accuracy</span>
+              <div className="text-2xl font-bold font-mono text-accentEmerald mt-1">{report.accuracy_pct}%</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 7: AUDIT HISTORY LEDGER
+    // ==========================================
+    function AuditHistoryLedgerView({ selectedAuditId }) {
+      const [history, setHistory] = useState([]);
+
+      useEffect(() => {
+        if (selectedAuditId) {
+          fetch(`/api/audit/${selectedAuditId}/history`)
+            .then(r => r.json())
+            .then(setHistory)
+            .catch(console.error);
+        }
+      }, [selectedAuditId]);
+
+      return (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-bold text-white">Append-Only Audit History Ledger</h3>
+            <p className="text-xs text-slate-400 mt-1">Immutable decision records. Original extracted values are permanently preserved.</p>
+          </div>
+
+          <div className="glow-card rounded-2xl overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-brandDark-900 text-slate-400 uppercase font-mono text-[11px] border-b border-brandDark-border">
+                <tr>
+                  <th className="px-6 py-3.5">Record</th>
+                  <th className="px-6 py-3.5">Metric</th>
+                  <th className="px-6 py-3.5">Original Value</th>
+                  <th className="px-6 py-3.5">Corrected Value</th>
+                  <th className="px-6 py-3.5">Decision</th>
+                  <th className="px-6 py-3.5">Justification</th>
+                  <th className="px-6 py-3.5">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brandDark-border text-slate-300 font-mono">
+                {history.length === 0 ? (
+                  <tr><td colSpan={7} className="px-6 py-6 text-center text-slate-500">No human reviews logged yet for this audit.</td></tr>
+                ) : (
+                  history.map(h => (
+                    <tr key={h.history_id} className="hover:bg-brandDark-900/50">
+                      <td className="px-6 py-4 text-slate-500">#{h.history_id}</td>
+                      <td className="px-6 py-4 font-sans font-bold text-white">{h.metric_name}</td>
+                      <td className="px-6 py-4 text-accentAmber">${h.original_value.toLocaleString()}M</td>
+                      <td className="px-6 py-4 text-accentEmerald font-bold">{h.corrected_value ? `$${h.corrected_value.toLocaleString()}M` : '—'}</td>
+                      <td className="px-6 py-4 uppercase font-bold text-accentCyan">{h.decision}</td>
+                      <td className="px-6 py-4 font-sans text-slate-300">{h.reason}</td>
+                      <td className="px-6 py-4 text-slate-500">{new Date(h.timestamp).toLocaleTimeString()}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 8: SETTINGS
+    // ==========================================
+    function SettingsView() {
+      return (
+        <div className="glow-card rounded-2xl p-6 max-w-xl space-y-4">
+          <h3 className="text-base font-bold text-white">System & Escalation Threshold Settings</h3>
+          <div className="space-y-3 text-xs">
+            <div className="flex justify-between items-center py-2 border-b border-brandDark-border">
+              <span className="text-slate-300">Base Confidence Threshold</span>
+              <span className="font-mono text-accentCyan font-bold">0.85 (85%)</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-brandDark-border">
+              <span className="text-slate-300">Accounting Equation Balance Tolerance</span>
+              <span className="font-mono text-accentEmerald font-bold">± $2.0 Million</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-brandDark-border">
+              <span className="text-slate-300">LangGraph Checkpointer Backend</span>
+              <span className="font-mono text-slate-400">SQLite State Graph</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mount the Application
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
