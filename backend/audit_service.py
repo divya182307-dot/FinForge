@@ -627,21 +627,43 @@ def generate_accuracy_report(audit_id: str, cursor) -> Dict[str, Any]:
     metrics = cursor.fetchall()
 
     cursor.execute("SELECT * FROM audit_history WHERE audit_id = ?", (audit_id,))
-    history = {h["metric_name"]: h for h in cursor.fetchall()}
+    history = {h["metric_name"]: dict(h) for h in cursor.fetchall()}
+
+    cursor.execute("SELECT * FROM review_items WHERE audit_id = ?", (audit_id,))
+    reviews = {r["metric_name"]: dict(r) for r in cursor.fetchall()}
 
     facts = COMPANY_FACTS.get(ticker, {}).get(period, {})
+    if not facts:
+        facts = COMPANY_FACTS.get(ticker, {}).get("FY2023", {})
+
+    # Invariant ground truth for Total Assets
+    metrics_by_name = {m["metric_name"]: m["extracted_value"] for m in metrics}
+    calc_assets_ground_truth = None
+    if "Total Liabilities" in metrics_by_name and "Shareholders' Equity" in metrics_by_name:
+        calc_assets_ground_truth = round(metrics_by_name["Total Liabilities"] + metrics_by_name["Shareholders' Equity"], 2)
+
     total_metrics = len(metrics)
     correct_count = 0
     incorrect_count = 0
     auto_approved = 0
-    escalated = len(history)
+    escalated = len(history) or len(reviews)
 
     comparison = []
 
     for m in metrics:
         name = m["metric_name"]
-        extracted = m["extracted_value"]
-        ground_truth = facts.get(name, extracted)
+        extracted = float(m["extracted_value"])
+        conf = float(m["confidence_score"])
+
+        # Determine official ground truth
+        if name in facts:
+            ground_truth = float(facts[name])
+        elif name == "Total Assets" and calc_assets_ground_truth is not None:
+            ground_truth = calc_assets_ground_truth
+        elif name in reviews and reviews[name].get("expected_value") is not None:
+            ground_truth = float(reviews[name]["expected_value"])
+        else:
+            ground_truth = extracted
 
         # Check if human corrected it
         final_value = extracted
@@ -652,15 +674,19 @@ def generate_accuracy_report(audit_id: str, cursor) -> Dict[str, Any]:
             human_intervention = True
             decision_applied = history[name]["decision"]
             if decision_applied == "correct" and history[name]["corrected_value"] is not None:
-                final_value = history[name]["corrected_value"]
+                final_value = float(history[name]["corrected_value"])
+            elif decision_applied in ("approve", "reject"):
+                final_value = extracted
 
-        is_accurate = abs(final_value - ground_truth) <= 1.0
+        variance = abs(final_value - ground_truth)
+        is_accurate = (variance <= 1.0) and (conf >= 0.85 or human_intervention)
+
         if is_accurate:
             correct_count += 1
         else:
             incorrect_count += 1
 
-        if not human_intervention and m["confidence_score"] >= 0.85:
+        if not human_intervention and conf >= 0.85 and variance <= 1.0:
             auto_approved += 1
 
         comparison.append({
@@ -670,10 +696,10 @@ def generate_accuracy_report(audit_id: str, cursor) -> Dict[str, Any]:
             "ground_truth_xbrl": ground_truth,
             "is_accurate": is_accurate,
             "unit": m["unit"],
-            "confidence_score": m["confidence_score"],
+            "confidence_score": conf,
             "human_intervention": human_intervention,
             "decision": decision_applied,
-            "variance": abs(final_value - ground_truth)
+            "variance": variance
         })
 
     accuracy_pct = round((correct_count / total_metrics * 100), 2) if total_metrics > 0 else 100.0

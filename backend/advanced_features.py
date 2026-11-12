@@ -754,7 +754,6 @@ def generate_audit_report_payload(audit_id: str) -> Dict[str, Any]:
     cursor.execute("SELECT * FROM audit_runs WHERE audit_id = ?", (audit_id,))
     audit_row = cursor.fetchone()
     if not audit_row:
-        # Fallback to most recent audit run
         cursor.execute("SELECT * FROM audit_runs ORDER BY started_at DESC LIMIT 1")
         audit_row = cursor.fetchone()
         if audit_row:
@@ -778,47 +777,149 @@ def generate_audit_report_payload(audit_id: str) -> Dict[str, Any]:
     cursor.execute("SELECT * FROM audit_history WHERE audit_id = ?", (audit_id,))
     history = [dict(h) for h in cursor.fetchall()]
 
-    cursor.execute("SELECT * FROM accuracy_reports WHERE audit_id = ?", (audit_id,))
-    acc_row = cursor.fetchone()
+    cursor.execute("SELECT * FROM review_items WHERE audit_id = ?", (audit_id,))
+    reviews = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
-    acc_report = dict(acc_row) if acc_row else {}
-    gt_map = {}
-    try:
-        raw_gt = json.loads(acc_report.get("ground_truth_json", "{}"))
-        if isinstance(raw_gt, list):
-            gt_map = {item["metric_name"]: item.get("ground_truth_xbrl", item.get("extracted_value")) for item in raw_gt}
-        elif isinstance(raw_gt, dict):
-            gt_map = raw_gt
-    except Exception:
-        pass
+    history_map = {h["metric_name"]: h for h in history}
+    reviews_map = {r["metric_name"]: r for r in reviews}
+
+    # SEC XBRL ground truth facts
+    facts = COMPANY_FACTS.get(ticker, {}).get(period, {})
+    if not facts:
+        facts = COMPANY_FACTS.get(ticker, {}).get("FY2023", {})
+
+    # Extract liabilities and equity for balance sheet invariant ground truth
+    metrics_by_name = {m["metric_name"]: m["extracted_value"] for m in metrics}
+    calc_assets_ground_truth = None
+    if "Total Liabilities" in metrics_by_name and "Shareholders' Equity" in metrics_by_name:
+        calc_assets_ground_truth = round(metrics_by_name["Total Liabilities"] + metrics_by_name["Shareholders' Equity"], 2)
 
     # Build metric reconciliation rows
     reconciliation_rows = []
+    passed_count = 0
+
     for m in metrics:
         name = m["metric_name"]
-        ext_val = m["extracted_value"]
-        gt_val = gt_map.get(name, ext_val)
-        variance = abs(ext_val - gt_val) if gt_val else 0.0
+        ext_val = float(m["extracted_value"])
+        conf = float(m["confidence_score"])
 
-        # Check if corrected in history
-        corrected_record = next((h for h in history if h["metric_name"] == name), None)
+        # Determine official ground truth
+        gt_val = None
+        if name in facts:
+            gt_val = float(facts[name])
+        elif name == "Total Assets" and calc_assets_ground_truth is not None:
+            gt_val = calc_assets_ground_truth
+        elif name in reviews_map and reviews_map[name].get("expected_value") is not None:
+            gt_val = float(reviews_map[name]["expected_value"])
+        else:
+            gt_val = ext_val
+
+        # Check if human reviewer took an action
+        corrected_record = history_map.get(name)
+        was_corrected = False
+        final_val = ext_val
+        audit_decision = None
+
+        if corrected_record:
+            audit_decision = corrected_record.get("decision", "").lower()
+            if audit_decision == "correct" and corrected_record.get("corrected_value") is not None:
+                final_val = float(corrected_record["corrected_value"])
+                was_corrected = True
+            elif audit_decision == "approve":
+                final_val = ext_val
+            elif audit_decision == "reject":
+                final_val = ext_val
+        else:
+            if name in reviews_map and reviews_map[name].get("status") == "pending":
+                audit_decision = "pending_review"
+
+        # Variances
+        original_variance = abs(ext_val - gt_val) if gt_val is not None else 0.0
+        final_variance = abs(final_val - gt_val) if gt_val is not None else 0.0
+
+        # Status and pass/fail determination
+        if audit_decision == "correct":
+            if final_variance <= 1.0:
+                reconciliation_status = "✓ AUDITOR CORRECTED (MATCH)"
+                status_color = "#38bdf8"
+                status_bg = "rgba(56, 189, 248, 0.15)"
+                is_pass = True
+            else:
+                reconciliation_status = f"⚠️ PARTIALLY CORRECTED (${final_variance:,.1f}M Diff)"
+                status_color = "#fbbf24"
+                status_bg = "rgba(251, 191, 36, 0.15)"
+                is_pass = False
+        elif audit_decision == "approve":
+            reconciliation_status = "✓ AUDITOR APPROVED (OVERRIDE)"
+            status_color = "#10b981"
+            status_bg = "rgba(16, 185, 129, 0.15)"
+            is_pass = True
+        elif audit_decision == "reject":
+            reconciliation_status = "✕ AUDITOR REJECTED"
+            status_color = "#f43f5e"
+            status_bg = "rgba(244, 63, 94, 0.15)"
+            is_pass = False
+        else:
+            # Unreviewed / Autonomous
+            if original_variance > 1.0:
+                reconciliation_status = f"⚠️ ${original_variance:,.1f}M MISMATCH"
+                status_color = "#f43f5e"
+                status_bg = "rgba(244, 63, 94, 0.2)"
+                is_pass = False
+            elif conf < 0.85:
+                reconciliation_status = f"⚠️ LOW CONFIDENCE ({conf*100:.0f}%)"
+                status_color = "#fbbf24"
+                status_bg = "rgba(251, 191, 36, 0.15)"
+                is_pass = False
+            else:
+                reconciliation_status = "✓ 100% MATCH"
+                status_color = "#10b981"
+                status_bg = "rgba(16, 185, 129, 0.15)"
+                is_pass = True
+
+        if is_pass:
+            passed_count += 1
 
         reconciliation_rows.append({
             "metric_name": name,
             "original_extracted_value": ext_val,
-            "confidence_score": m["confidence_score"],
-            "was_corrected": bool(corrected_record),
-            "final_audited_value": corrected_record["corrected_value"] if corrected_record else ext_val,
+            "confidence_score": conf,
+            "was_corrected": was_corrected,
+            "final_audited_value": final_val,
             "sec_xbrl_ground_truth": gt_val,
-            "variance": variance,
-            "reconciliation_status": "100% MATCH" if variance < 1.0 else f"${variance:,.1f}M Variance"
+            "variance": final_variance if was_corrected else original_variance,
+            "reconciliation_status": reconciliation_status,
+            "status_color": status_color,
+            "status_bg": status_bg,
+            "is_pass": is_pass
         })
+
+    total_metrics_count = len(reconciliation_rows)
+    accuracy_pct = round((passed_count / total_metrics_count * 100), 1) if total_metrics_count > 0 else 100.0
+
+    # Determine certificate badge text and style
+    has_corrections = any(r["was_corrected"] for r in reconciliation_rows)
+    if passed_count == total_metrics_count and not has_corrections:
+        badge_text = "✓ SEC XBRL VERIFIED 100%"
+        badge_color = "#10b981"
+        badge_bg = "rgba(16, 185, 129, 0.15)"
+        badge_border = "rgba(16, 185, 129, 0.3)"
+    elif passed_count == total_metrics_count and has_corrections:
+        badge_text = "✓ AUDITOR CERTIFIED (100% RECONCILED)"
+        badge_color = "#38bdf8"
+        badge_bg = "rgba(56, 189, 248, 0.15)"
+        badge_border = "rgba(56, 189, 248, 0.3)"
+    else:
+        discrepancies = total_metrics_count - passed_count
+        badge_text = f"⚠️ {discrepancies} DISCREPANCY DETECTED (REVIEW PENDING)"
+        badge_color = "#f43f5e"
+        badge_bg = "rgba(244, 63, 94, 0.15)"
+        badge_border = "rgba(244, 63, 94, 0.3)"
 
     report_id = f"cert_{uuid.uuid4().hex[:12]}"
     now = _get_utc_now_iso()
 
-    # SHA256 integrity seal for report
     raw_payload = f"{audit_id}:{ticker}:{period}:{now}:{len(metrics)}"
     seal_hash = _sha256_hash(raw_payload)
 
@@ -832,13 +933,18 @@ def generate_audit_report_payload(audit_id: str) -> Dict[str, Any]:
         "filing_type": "Form 10-K (Annual Report)",
         "audit_status": audit_row["status"],
         "generated_at": now,
-        "overall_accuracy_pct": acc_report.get("accuracy_pct", 100.0),
-        "total_metrics_evaluated": len(metrics),
-        "auto_approved_count": acc_report.get("auto_approved_count", len(metrics)),
-        "human_escalated_count": acc_report.get("escalated_count", len(history)),
+        "overall_accuracy_pct": accuracy_pct,
+        "badge_text": badge_text,
+        "badge_color": badge_color,
+        "badge_bg": badge_bg,
+        "badge_border": badge_border,
+        "total_metrics_evaluated": total_metrics_count,
+        "auto_approved_count": sum(1 for r in reconciliation_rows if r["is_pass"] and not r["was_corrected"]),
+        "human_escalated_count": len(history) or len(reviews),
         "metrics_reconciliation": reconciliation_rows,
         "validation_checks": validations,
         "human_decisions_log": history,
+        "has_pending_reviews": any(r.get("status") == "pending" for r in reviews),
         "integrity_seal_hash": seal_hash,
         "auditor_signature": "FinForge AI Autonomous Agent & Certified HITL Reviewer"
     }
@@ -850,25 +956,37 @@ def generate_audit_report_html(audit_id: str) -> str:
 
     rows_html = "".join([
         f"""<tr>
-            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600;">{r['metric_name']}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">{r['metric_name']}</td>
             <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">${r['original_extracted_value']:,.1f}M</td>
-            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">{r['confidence_score']*100:.1f}%</td>
-            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: {'#38bdf8' if r['was_corrected'] else '#e2e8f0'};">${r['final_audited_value']:,.1f}M</td>
-            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">${r['sec_xbrl_ground_truth']:,.1f}M</td>
-            <td style="padding: 10px; border-bottom: 1px solid #1e293b; color: #10b981; font-weight: bold;">{r['reconciliation_status']}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: {'#f43f5e' if r['confidence_score'] < 0.85 else '#94a3b8'}; font-weight: {'bold' if r['confidence_score'] < 0.85 else 'normal'};">
+                {r['confidence_score']*100:.1f}% {'(FLAGGED)' if r['confidence_score'] < 0.85 else ''}
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: {'#38bdf8' if r['was_corrected'] else ('#f43f5e' if not r['is_pass'] else '#e2e8f0')}; font-weight: {'bold' if r['was_corrected'] else 'normal'};">
+                ${r['final_audited_value']:,.1f}M {'(CORRECTED)' if r['was_corrected'] else ''}
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">${r['sec_xbrl_ground_truth']:,.1f}M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: {r['status_color']}; background: {r['status_bg']}; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    {r['reconciliation_status']}
+                </span>
+            </td>
         </tr>"""
         for r in data["metrics_reconciliation"]
     ])
 
     history_html = "".join([
-        f"""<div style="background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #38bdf8;">
-            <div style="font-weight: bold; color: #38bdf8;">Decision: {h['decision'].upper()} on {h['metric_name']}</div>
-            <div style="font-size: 13px; color: #94a3b8;">Original: ${h['original_value']:,.1f}M | Corrected: ${h['corrected_value']:,.1f}M</div>
-            <div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">Reason: {h['reason']}</div>
-            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Timestamp: {h['timestamp']}</div>
+        f"""<div style="background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid {'#38bdf8' if h['decision'] == 'correct' else '#10b981'};">
+            <div style="font-weight: bold; color: {'#38bdf8' if h['decision'] == 'correct' else '#10b981'}; font-size: 13px;">Decision: {h['decision'].upper()} on {h['metric_name']}</div>
+            <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Original: ${h['original_value']:,.1f}M {f'| Corrected: ${h["corrected_value"]:,.1f}M' if h.get("corrected_value") is not None else ''}</div>
+            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">Reason: {h['reason']}</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Auditor Sign-off: {h.get('reviewer', 'Certified Auditor')} | Timestamp: {h['timestamp']}</div>
         </div>"""
         for h in data["human_decisions_log"]
-    ]) if data["human_decisions_log"] else "<div style='color: #64748b;'>No manual corrections required. All metrics auto-approved.</div>"
+    ]) if data["human_decisions_log"] else (
+        "<div style='color: #fbbf24; background: rgba(251,191,36,0.1); padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b;'>⚠️ Escalation in Progress: Metric flagged for Human Review. Awaiting decision in Human Review Center.</div>"
+        if data.get("has_pending_reviews") else
+        "<div style='color: #64748b;'>No manual corrections required. All metrics auto-approved with high confidence (≥85%) and balance sheet validation.</div>"
+    )
 
     return f"""<!DOCTYPE html>
 <html>
@@ -1018,7 +1136,7 @@ def generate_audit_report_html(audit_id: str) -> str:
                 <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">Autonomous SEC EDGAR Filing Audit Certificate</p>
             </div>
             <div style="text-align: right;">
-                <span class="badge">SEC XBRL VERIFIED 100%</span>
+                <span class="badge" style="background: {data['badge_bg']}; color: {data['badge_color']}; border: 1px solid {data['badge_border']};">{data['badge_text']}</span>
                 <div style="font-size: 11px; color: #64748b; margin-top: 6px; font-family: monospace;">Report ID: {data['report_id']}</div>
             </div>
         </div>

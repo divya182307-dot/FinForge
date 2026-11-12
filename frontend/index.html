@@ -3138,7 +3138,82 @@
               </div>
               <div className="glow-card rounded-2xl p-4">
                 <span className="text-xs text-slate-400">Final Verified Accuracy</span>
-                <div className="text-2xl font-bold font-mono text-accentEmerald mt-1">{report.accuracy_pct}%</div>
+                <div className={`text-2xl font-bold font-mono mt-1 ${report.accuracy_pct === 100 ? 'text-accentEmerald' : 'text-accentAmber'}`}>
+                  {report.accuracy_pct}%
+                </div>
+              </div>
+            </div>
+          )}
+
+          {report && report.ground_truth_comparison && (
+            <div className="glow-card rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-brandDark-border pb-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white font-mono">SEC EDGAR XBRL Ground Truth Reconciliation</h4>
+                  <p className="text-xs text-slate-400 mt-0.5">Comprehensive audit matrix comparing extracted filing values against official XBRL facts and auditor decisions.</p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
+                  report.accuracy_pct === 100 ? 'bg-emerald-500/15 text-accentEmerald border-emerald-500/30' : 'bg-rose-500/15 text-accentRose border-rose-500/30'
+                }`}>
+                  {report.accuracy_pct === 100 ? '✓ 100% RECONCILED' : `⚠️ ${report.total_metrics - report.correct_metrics} DISCREPANCY DETECTED`}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-brandDark-900 text-slate-400 uppercase text-[11px] border-b border-brandDark-border">
+                    <tr>
+                      <th className="py-3 px-3">Metric</th>
+                      <th className="py-3 px-3">Extracted</th>
+                      <th className="py-3 px-3">Confidence</th>
+                      <th className="py-3 px-3">Final Value</th>
+                      <th className="py-3 px-3">SEC XBRL Fact</th>
+                      <th className="py-3 px-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brandDark-border text-slate-300">
+                    {report.ground_truth_comparison.map((item, idx) => {
+                      const isAccurate = item.is_accurate;
+                      const conf = Number(item.confidence_score || 0);
+                      const isLowConf = conf < 0.85;
+                      const hasVar = item.variance > 1.0;
+                      return (
+                        <tr key={idx} className="hover:bg-brandDark-900/50">
+                          <td className="py-3 px-3 font-semibold text-white font-sans">{item.metric_name}</td>
+                          <td className="py-3 px-3 text-slate-300">${Number(item.extracted_value || 0).toLocaleString()}M</td>
+                          <td className="py-3 px-3">
+                            <span className={isLowConf ? 'text-accentRose font-bold' : 'text-slate-400'}>
+                              {(conf * 100).toFixed(1)}% {isLowConf ? '(FLAGGED)' : ''}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-bold text-white">
+                            ${Number(item.final_value || 0).toLocaleString()}M {item.human_intervention ? <span className="text-accentCyan text-[10px] ml-1 font-semibold">(CORRECTED)</span> : ''}
+                          </td>
+                          <td className="py-3 px-3 text-slate-400">${Number(item.ground_truth_xbrl || 0).toLocaleString()}M</td>
+                          <td className="py-3 px-3">
+                            {item.human_intervention ? (
+                              <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-500/15 text-accentCyan border border-sky-500/30">
+                                ✓ AUDITOR CORRECTED
+                              </span>
+                            ) : hasVar ? (
+                              <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-500/15 text-accentRose border border-rose-500/30">
+                                ⚠️ ${item.variance.toLocaleString()}M MISMATCH
+                              </span>
+                            ) : isLowConf ? (
+                              <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/15 text-accentAmber border border-amber-500/30">
+                                ⚠️ LOW CONFIDENCE
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-accentEmerald border border-emerald-500/30">
+                                ✓ 100% MATCH
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
