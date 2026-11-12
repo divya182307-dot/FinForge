@@ -6,6 +6,7 @@
   <title>FinForge AI — Human-in-the-Loop Financial Filing Auditor</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -277,6 +278,64 @@
       const [riskData, setRiskData] = useState(null);
 
       const [isStartAuditOpen, setIsStartAuditOpen] = useState(false);
+      const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+      const handleDownloadPdfReport = async (auditId) => {
+        const targetId = auditId || selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : null);
+        if (!targetId) {
+          showToast('Please run or select an audit before downloading its report', 'error');
+          return;
+        }
+        showToast('Preparing official certified PDF audit report...', 'success');
+        try {
+          const res = await fetch(`/api/audit/${targetId}/report/html`);
+          const htmlText = await res.text();
+
+          const tempDiv = document.createElement('div');
+          tempDiv.id = 'temp-pdf-export-container';
+          tempDiv.style.position = 'fixed';
+          tempDiv.style.left = '-9999px';
+          tempDiv.style.top = '0';
+          tempDiv.style.width = '850px';
+          tempDiv.innerHTML = htmlText;
+
+          // Remove the no-print action bar from the PDF export
+          const noPrint = tempDiv.querySelector('.no-print');
+          if (noPrint) noPrint.remove();
+
+          document.body.appendChild(tempDiv);
+          const targetEl = tempDiv.querySelector('.container') || tempDiv;
+
+          const ticker = auditDetails?.ticker || 'COMPANY';
+          const period = auditDetails?.period || 'FY2023';
+          const filename = `FinForge_Certified_Audit_Report_${ticker}_${period}.pdf`;
+
+          if (window.html2pdf) {
+            const opt = {
+              margin: [10, 10, 10, 10],
+              filename: filename,
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, backgroundColor: '#070b14' },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            await window.html2pdf().set(opt).from(targetEl).save();
+            showToast(`✓ Downloaded ${filename}!`, 'success');
+          } else {
+            const printWin = window.open(`/api/audit/${targetId}/report/html`, '_blank');
+            if (printWin) {
+              printWin.focus();
+              showToast('Report opened in new tab. Click Download PDF in the header.');
+            } else {
+              window.location.href = `/api/audit/${targetId}/report/html`;
+            }
+          }
+          document.body.removeChild(tempDiv);
+        } catch (err) {
+          console.error('PDF generation error:', err);
+          window.open(`/api/audit/${targetId}/report/html`, '_blank');
+          showToast('Opened report in tab for printing: ' + err.message, 'error');
+        }
+      };
       const [auditModalTab, setAuditModalTab] = useState('preset'); // 'preset' | 'upload'
       const [uploadTicker, setUploadTicker] = useState('TSLA');
       const [uploadCompany, setUploadCompany] = useState('Tesla, Inc.');
@@ -603,8 +662,17 @@
                   <span>Ask Copilot</span>
                 </button>
                 <button
-                  onClick={() => window.open(`/api/audit/${selectedAuditId}/report/html`, '_blank')}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-accentEmerald/15 border border-accentEmerald/30 text-accentEmerald hover:bg-accentEmerald/25 text-xs font-semibold transition"
+                  onClick={() => handleDownloadPdfReport(selectedAuditId)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-accentEmerald/20 border border-accentEmerald/40 text-accentEmerald hover:bg-accentEmerald hover:text-brandDark-950 text-xs font-bold transition shadow"
+                  title="Download certified PDF audit report"
+                >
+                  <span>📥</span>
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-accentCyan/15 border border-accentCyan/30 text-accentCyan hover:bg-accentCyan/25 text-xs font-semibold transition"
+                  title="View certified audit certificate"
                 >
                   <span>📜</span>
                   <span>Certificate</span>
@@ -634,6 +702,58 @@
                 </div>
               </div>
             </header>
+
+                      {/* AUDIT CERTIFICATE & REPORT MODAL (INLINE PDF VIEWER) */}
+          {isReportModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+              <div className="bg-brandDark-900 border border-brandDark-border rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden">
+                <div className="px-6 py-4 border-b border-brandDark-border bg-brandDark-950 flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="text-xl">📜</span>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Official Certified Audit Report</h3>
+                      <span className="text-xs font-mono text-slate-400">
+                        {auditDetails?.ticker || 'Target'} ({auditDetails?.period || 'FY2023'}) · Audit ID: {selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => handleDownloadPdfReport(selectedAuditId)}
+                      className="px-3.5 py-1.5 rounded-xl bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 text-xs font-bold font-mono flex items-center space-x-1.5 shadow transition"
+                    >
+                      <span>📥</span>
+                      <span>Download PDF</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const targetId = selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '');
+                        window.open(`/api/audit/${targetId}/report/html`, '_blank');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-brandDark-800 hover:bg-brandDark-700 text-xs text-accentCyan border border-accentCyan/30 font-mono transition"
+                    >
+                      <span>🔗</span>
+                      <span>Open in New Tab</span>
+                    </button>
+                    <button
+                      onClick={() => setIsReportModalOpen(false)}
+                      className="px-3 py-1.5 rounded-xl bg-brandDark-800 text-xs text-slate-400 hover:text-white transition"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 bg-[#070b14] overflow-hidden p-2">
+                  <iframe
+                    src={`/api/audit/${selectedAuditId || (audits && audits.length > 0 ? audits[0].audit_id : '')}/report/html`}
+                    className="w-full h-full rounded-xl border border-brandDark-border"
+                    title="Audit Certificate Viewer"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
             {/* SCROLLABLE MAIN VIEW AREA */}
             <main className="flex-1 overflow-y-auto p-8 space-y-6">
@@ -784,6 +904,8 @@
                   auditDetails={auditDetails}
                   selectedAuditId={selectedAuditId}
                   riskData={riskData}
+                  onDownloadPdf={(aid) => handleDownloadPdfReport(aid)}
+                  onViewCertificate={() => setIsReportModalOpen(true)}
                 />
               )}
 
@@ -2927,7 +3049,7 @@
     // ==========================================
     // FEATURE 4 & 8: VALIDATION REPORTS & RISK
     // ==========================================
-    function ValidationReportsView({ selectedAuditId, riskData }) {
+    function ValidationReportsView({ selectedAuditId, riskData, onDownloadPdf, onViewCertificate }) {
       const [report, setReport] = React.useState(null);
 
       React.useEffect(() => {
@@ -2946,13 +3068,22 @@
               <h3 className="text-xl font-bold text-white">SEC EDGAR XBRL Accuracy & Risk Assessment</h3>
               <p className="text-xs text-slate-400 mt-1">Reconciliation against official SEC EDGAR XBRL ground truth facts and explainable risk factor scoring.</p>
             </div>
-            <button
-              onClick={() => window.open(`/api/audit/${selectedAuditId}/report/html`, '_blank')}
-              className="px-4 py-2 rounded-xl bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 text-xs font-bold font-mono flex items-center space-x-1.5 shadow-lg shadow-accentEmerald/20 transition"
-            >
-              <span>📜</span>
-              <span>Generate Certified Audit Report (PDF/HTML)</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => onDownloadPdf ? onDownloadPdf(selectedAuditId) : window.open(`/api/audit/${selectedAuditId}/report/html`, '_blank')}
+                className="px-4 py-2 rounded-xl bg-accentEmerald hover:bg-[#00b572] text-brandDark-950 text-xs font-bold font-mono flex items-center space-x-2 shadow-lg shadow-accentEmerald/20 transition"
+              >
+                <span>📥</span>
+                <span>Download PDF Report</span>
+              </button>
+              <button
+                onClick={() => onViewCertificate ? onViewCertificate() : window.open(`/api/audit/${selectedAuditId}/report/html`, '_blank')}
+                className="px-3.5 py-2 rounded-xl bg-accentCyan/15 border border-accentCyan/40 text-accentCyan hover:bg-accentCyan/25 text-xs font-mono font-semibold flex items-center space-x-1.5 transition"
+              >
+                <span>📜</span>
+                <span>View Certificate</span>
+              </button>
+            </div>
           </div>
 
           {/* Feature 4: Explainable Financial Risk Score */}

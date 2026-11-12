@@ -744,11 +744,24 @@ def generate_audit_report_payload(audit_id: str) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Graceful fallback: if audit_id is empty or placeholder, find latest audit
+    if not audit_id or audit_id in ("undefined", "null", "default", "latest"):
+        cursor.execute("SELECT audit_id FROM audit_runs ORDER BY started_at DESC LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            audit_id = row["audit_id"]
+
     cursor.execute("SELECT * FROM audit_runs WHERE audit_id = ?", (audit_id,))
     audit_row = cursor.fetchone()
     if not audit_row:
-        conn.close()
-        return {"error": "Audit not found"}
+        # Fallback to most recent audit run
+        cursor.execute("SELECT * FROM audit_runs ORDER BY started_at DESC LIMIT 1")
+        audit_row = cursor.fetchone()
+        if audit_row:
+            audit_id = audit_row["audit_id"]
+        else:
+            conn.close()
+            return {"error": "Audit not found"}
 
     ticker = audit_row["ticker"]
     period = audit_row["period"]
@@ -862,13 +875,62 @@ def generate_audit_report_html(audit_id: str) -> str:
 <head>
     <meta charset="utf-8">
     <title>FinForge AI Audit Certificate - {data['ticker']} {data['period']}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #070b14;
             color: #e2e8f0;
-            padding: 40px;
+            padding: 30px;
             margin: 0;
+        }}
+        .no-print {{
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            max-width: 900px;
+            margin: 0 auto 20px auto;
+            background: rgba(12, 18, 32, 0.95);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 1px solid #1e293b;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }}
+        .btn {{
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }}
+        .btn-pdf {{
+            background: #00e599;
+            color: #042f2e;
+            box-shadow: 0 2px 10px rgba(0,229,153,0.3);
+        }}
+        .btn-pdf:hover {{
+            background: #00ffaa;
+            transform: translateY(-1px);
+        }}
+        .btn-print {{
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #0284c7;
+        }}
+        .btn-print:hover {{
+            background: #0f172a;
+        }}
+        .btn-close {{
+            background: #10182b;
+            color: #94a3b8;
+            border: 1px solid #334155;
         }}
         .container {{
             max-width: 900px;
@@ -921,13 +983,33 @@ def generate_audit_report_html(audit_id: str) -> str:
             color: #64748b;
         }}
         @media print {{
-            body {{ background: white; color: black; }}
-            .container {{ border: none; box-shadow: none; padding: 0; }}
+            .no-print {{ display: none !important; }}
+            body {{ background: white !important; color: black !important; padding: 0 !important; }}
+            .container {{ border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; background: white !important; color: black !important; }}
+            th {{ background: #f1f5f9 !important; color: #334155 !important; border-bottom: 2px solid #cbd5e1 !important; }}
+            td {{ border-bottom: 1px solid #e2e8f0 !important; color: black !important; }}
         }}
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="no-print">
+        <span style="font-size: 12px; color: #94a3b8; margin-right: auto; font-family: monospace;">
+            Official Certified Report · {data['ticker']} ({data['period']})
+        </span>
+        <button id="downloadPdfBtn" onclick="downloadAsPdf()" class="btn btn-pdf">
+            <span>📥</span>
+            <span>Download PDF Report</span>
+        </button>
+        <button onclick="window.print()" class="btn btn-print">
+            <span>🖨️</span>
+            <span>Print Certificate</span>
+        </button>
+        <button onclick="window.close()" class="btn btn-close">
+            <span>✕</span>
+            <span>Close</span>
+        </button>
+    </div>
+    <div class="container" id="reportContent">
         <div class="header">
             <div>
                 <h1 style="margin: 0; color: white; font-size: 24px; letter-spacing: -0.5px;">
@@ -987,7 +1069,37 @@ def generate_audit_report_html(audit_id: str) -> str:
             <div style="word-break: break-all; margin-top: 4px; color: #38bdf8;">{data['integrity_seal_hash']}</div>
             <div style="margin-top: 6px;">Generated at: {data['generated_at']} | Certified by: {data['auditor_signature']}</div>
         </div>
+
+        <div style="margin-top: 30px; text-align: center; color: #64748b; font-size: 11px;">
+            FinForge AI Autonomous Agentic Audit Platform · Form 10-K Compliance Gateway · ISO/XBRL 2024
+        </div>
     </div>
+
+    <script>
+        function downloadAsPdf() {{
+            const btn = document.getElementById('downloadPdfBtn');
+            if (btn) btn.innerHTML = '<span>⏳</span><span>Generating PDF...</span>';
+            const element = document.getElementById('reportContent') || document.querySelector('.container') || document.body;
+            const opt = {{
+                margin: [10, 10, 10, 10],
+                filename: 'FinForge_Audit_Certificate_{data['ticker']}_{data['period']}.pdf',
+                image: {{ type: 'jpeg', quality: 0.98 }},
+                html2canvas: {{ scale: 2, useCORS: true, backgroundColor: '#070b14' }},
+                jsPDF: {{ unit: 'mm', format: 'a4', orientation: 'portrait' }}
+            }};
+            if (window.html2pdf) {{
+                window.html2pdf().set(opt).from(element).save().then(() => {{
+                    if (btn) btn.innerHTML = '<span>✓</span><span>Downloaded PDF!</span>';
+                    setTimeout(() => {{ if (btn) btn.innerHTML = '<span>📥</span><span>Download PDF Report</span>'; }}, 3000);
+                }}).catch(err => {{
+                    console.error('html2pdf error:', err);
+                    window.print();
+                }});
+            }} else {{
+                window.print();
+            }}
+        }}
+    </script>
 </body>
 </html>"""
 
