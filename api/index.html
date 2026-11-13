@@ -633,6 +633,12 @@
               setAuditDetails(freshDetails);
               setSelectedAuditId(targetAid);
             }
+
+            // 4. Redirect to next expected page: Financial Metrics
+            if (targetAid) {
+              setSelectedAuditId(targetAid);
+            }
+            setActiveNav('metrics');
           } else {
             showToast(result.detail || result.error || result.message || 'Review decision failed', 'error');
           }
@@ -656,8 +662,6 @@
         { id: 'monitoring', label: 'Live 9-Stage Monitor', icon: '🔄' },
         { id: 'reports', label: 'Validation & Risk', icon: '🛡️' },
         { id: 'history', label: 'Tamper-Evident Ledger', icon: '🔒' },
-        { id: 'feedback', label: 'Reviewer Feedback', icon: '💡' },
-        { id: 'copilot', label: 'FinForge Copilot', icon: '🤖' },
         { id: 'settings', label: 'Settings', icon: '⚙️' },
       ];
 
