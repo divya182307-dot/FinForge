@@ -371,7 +371,18 @@
     }
 
     const FALLBACK_COMPANY_METRICS = {
-      NVDA: [
+      'NVDA_FY2024': [
+        { metric_id: 'nvda24_1', metric_name: 'Revenue', extracted_value: 60922.0, unit: 'USD Millions', confidence_score: 0.99, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Total revenue for fiscal year ended January 28, 2024 was $60,922 million.' },
+        { metric_id: 'nvda24_2', metric_name: 'Net Income', extracted_value: 29760.0, unit: 'USD Millions', confidence_score: 1.0, validation_status: 'corrected', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Net income was $29,760 million (Auditor verified and reconciled with SEC Form 10-K).' },
+        { metric_id: 'nvda24_3', metric_name: 'Total Assets', extracted_value: 65728.0, unit: 'USD Millions', confidence_score: 0.97, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Consolidated Balance Sheets', source_evidence: 'Total assets reported as $65,728 million.' },
+        { metric_id: 'nvda24_4', metric_name: 'Total Liabilities', extracted_value: 22750.0, unit: 'USD Millions', confidence_score: 0.96, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Consolidated Balance Sheets', source_evidence: 'Total liabilities were $22,750 million as of January 28, 2024.' },
+        { metric_id: 'nvda24_5', metric_name: "Shareholders' Equity", extracted_value: 42978.0, unit: 'USD Millions', confidence_score: 0.96, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Consolidated Balance Sheets', source_evidence: 'Total stockholders equity was $42,978 million as of January 28, 2024.' },
+        { metric_id: 'nvda24_6', metric_name: 'Operating Cash Flow', extracted_value: 28090.0, unit: 'USD Millions', confidence_score: 0.98, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Cash Flows', source_evidence: 'Net cash provided by operating activities was $28,090 million.' },
+        { metric_id: 'nvda24_7', metric_name: 'Gross Profit', extracted_value: 44301.0, unit: 'USD Millions', confidence_score: 0.97, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Gross profit was $44,301 million.' },
+        { metric_id: 'nvda24_8', metric_name: 'Operating Income', extracted_value: 32972.0, unit: 'USD Millions', confidence_score: 0.98, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Operating income was $32,972 million.' },
+        { metric_id: 'nvda24_9', metric_name: 'Cash and Cash Equivalents', extracted_value: 7280.0, unit: 'USD Millions', confidence_score: 0.98, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Consolidated Balance Sheets', source_evidence: 'Cash and cash equivalents was $7,280 million.' }
+      ],
+      'NVDA_FY2023': [
         { metric_id: 'nvda_1', metric_name: 'Revenue', extracted_value: 26974.0, unit: 'USD Millions', confidence_score: 0.99, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Total revenue for fiscal year ended January 29, 2023 was $26,974 million.' },
         { metric_id: 'nvda_2', metric_name: 'Net Income', extracted_value: 4368.0, unit: 'USD Millions', confidence_score: 0.98, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Net income was $4,368 million compared to $9,752 million in prior year.' },
         { metric_id: 'nvda_3', metric_name: 'Total Assets', extracted_value: 41182.0, unit: 'USD Millions', confidence_score: 1.0, validation_status: 'corrected', sec_filing_ref: 'Form 10-K, Item 8, Consolidated Balance Sheets', source_evidence: 'Total assets reported as $41,182 million (Total Liabilities $19,081M + Stockholders Equity $22,101M).' },
@@ -382,7 +393,7 @@
         { metric_id: 'nvda_8', metric_name: 'Operating Income', extracted_value: 4224.0, unit: 'USD Millions', confidence_score: 0.98, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Operating income was $4224 million.' },
         { metric_id: 'nvda_9', metric_name: 'Cash and Cash Equivalents', extracted_value: 3389.0, unit: 'USD Millions', confidence_score: 0.98, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Consolidated Balance Sheets', source_evidence: 'Cash and cash equivalents was $3,389 million.' }
       ],
-      AAPL: [
+      'AAPL_FY2023': [
         { metric_id: 'aapl_1', metric_name: 'Revenue', extracted_value: 383285.0, unit: 'USD Millions', confidence_score: 0.99, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Total net sales were $383,285 million for fiscal year 2023.' },
         { metric_id: 'aapl_2', metric_name: 'Net Income', extracted_value: 96995.0, unit: 'USD Millions', confidence_score: 0.98, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Statement of Operations', source_evidence: 'Net income was $96,995 million.' },
         { metric_id: 'aapl_3', metric_name: 'Total Assets', extracted_value: 352583.0, unit: 'USD Millions', confidence_score: 0.99, validation_status: 'passed', sec_filing_ref: 'Form 10-K, Item 8, Consolidated Balance Sheets', source_evidence: 'Total assets were $352,583 million as of September 30, 2023.' },
@@ -396,8 +407,10 @@
     };
 
     function getFallbackMetricsForCompany(ticker = 'NVDA', period = 'FY2023') {
-      const clean = (ticker || 'NVDA').toUpperCase();
-      return FALLBACK_COMPANY_METRICS[clean] || FALLBACK_COMPANY_METRICS.NVDA;
+      const cleanTicker = (ticker || 'NVDA').toUpperCase();
+      const cleanPeriod = (period || 'FY2023').toUpperCase();
+      const key = `${cleanTicker}_${cleanPeriod}`;
+      return FALLBACK_COMPANY_METRICS[key] || FALLBACK_COMPANY_METRICS[`${cleanTicker}_FY2023`] || FALLBACK_COMPANY_METRICS['NVDA_FY2023'];
     }
 
     // MAIN APPLICATION CONTAINER
@@ -825,9 +838,26 @@
               };
             });
 
-            // 3. If server returned updated audit_details, merge it in
+            // 3. If server returned updated audit_details, merge it in, preserving the custom entered value
             if (result && result.audit_details && Array.isArray(result.audit_details.metrics) && result.audit_details.metrics.length > 0) {
-              setAuditDetails(result.audit_details);
+              setAuditDetails(prev => {
+                const srv = result.audit_details;
+                return {
+                  ...srv,
+                  status: 'completed',
+                  metrics: srv.metrics.map(m => {
+                    if (m.metric_name === item.metric_name && action === 'correct' && correctedValue !== null && correctedValue !== undefined) {
+                      return {
+                        ...m,
+                        extracted_value: Number(correctedValue),
+                        confidence_score: 1.0,
+                        validation_status: 'corrected'
+                      };
+                    }
+                    return m;
+                  })
+                };
+              });
             }
 
             // 4. Update selected audit and redirect immediately to Financial Metrics!
@@ -838,12 +868,28 @@
 
             // 5. Reload server data in background
             loadData();
-            if (targetAid && (!result || !result.audit_details || !result.audit_details.metrics)) {
+            if (targetAid) {
               fetch(`/api/audit/${targetAid}`)
                 .then(r => r.json())
                 .then(fresh => {
-                  if (fresh && fresh.metrics && fresh.metrics.length > 0) {
-                    setAuditDetails(fresh);
+                  if (fresh && Array.isArray(fresh.metrics) && fresh.metrics.length > 0) {
+                    setAuditDetails(prev => {
+                      return {
+                        ...fresh,
+                        status: 'completed',
+                        metrics: fresh.metrics.map(m => {
+                          if (m.metric_name === item.metric_name && action === 'correct' && correctedValue !== null && correctedValue !== undefined) {
+                            return {
+                              ...m,
+                              extracted_value: Number(correctedValue),
+                              confidence_score: 1.0,
+                              validation_status: 'corrected'
+                            };
+                          }
+                          return m;
+                        })
+                      };
+                    });
                   }
                 })
                 .catch(console.error);

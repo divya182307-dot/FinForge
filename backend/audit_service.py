@@ -644,16 +644,34 @@ def process_review_decision(
     cursor.execute("""
     UPDATE review_items
     SET status = ?, resolved_at = ?
-    WHERE review_id = ?
-    """, (f"{decision}d" if decision != "correct" else "corrected", now, actual_review_id))
+    WHERE review_id = ? OR (audit_id = ? AND metric_name = ?)
+    """, (
+        f"{decision}d" if decision != "correct" else "corrected",
+        now,
+        actual_review_id,
+        audit_id,
+        metric_name
+    ))
 
-    # Update extracted_metrics validation_status (Never overwrite extracted_value!)
-    new_vstatus = "passed" if decision in ("approve", "correct") else "failed"
-    cursor.execute("""
-    UPDATE extracted_metrics
-    SET validation_status = ?
-    WHERE metric_id = ?
-    """, (new_vstatus, metric_id))
+    # Update extracted_metrics with verified/corrected financial value and 100% confidence
+    if decision == "correct" and corrected_value is not None:
+        cursor.execute("""
+        UPDATE extracted_metrics
+        SET extracted_value = ?, confidence_score = 1.0, validation_status = 'corrected'
+        WHERE metric_id = ? OR (audit_id = ? AND metric_name = ?)
+        """, (corrected_value, metric_id, audit_id, metric_name))
+    elif decision == "approve":
+        cursor.execute("""
+        UPDATE extracted_metrics
+        SET confidence_score = 1.0, validation_status = 'approved'
+        WHERE metric_id = ? OR (audit_id = ? AND metric_name = ?)
+        """, (metric_id, audit_id, metric_name))
+    elif decision == "reject":
+        cursor.execute("""
+        UPDATE extracted_metrics
+        SET validation_status = 'rejected'
+        WHERE metric_id = ? OR (audit_id = ? AND metric_name = ?)
+        """, (metric_id, audit_id, metric_name))
 
     # Check if there are any remaining pending reviews for this audit
     cursor.execute("SELECT COUNT(*) as pending_count FROM review_items WHERE audit_id = ? AND status = 'pending'", (audit_id,))
