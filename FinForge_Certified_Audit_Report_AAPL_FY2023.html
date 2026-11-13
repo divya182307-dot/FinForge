@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>FinForge AI Audit Certificate - AAPL FY2023</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #070b14;
+            color: #e2e8f0;
+            padding: 30px;
+            margin: 0;
+        }
+        .no-print {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            max-width: 900px;
+            margin: 0 auto 20px auto;
+            background: rgba(12, 18, 32, 0.95);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 1px solid #1e293b;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .btn {
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-pdf {
+            background: #00e599;
+            color: #042f2e;
+            box-shadow: 0 2px 10px rgba(0,229,153,0.3);
+        }
+        .btn-pdf:hover {
+            background: #00ffaa;
+            transform: translateY(-1px);
+        }
+        .btn-print {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #0284c7;
+        }
+        .btn-print:hover {
+            background: #0f172a;
+        }
+        .btn-close {
+            background: #10182b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #0c1220;
+            border: 1px solid #1e293b;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+        .badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th {
+            text-align: left;
+            background: #10182b;
+            padding: 12px 10px;
+            border-bottom: 2px solid #334155;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+        .seal {
+            margin-top: 30px;
+            padding: 15px;
+            border: 1px dashed #334155;
+            border-radius: 8px;
+            background: #0a0f1d;
+            font-family: monospace;
+            font-size: 11px;
+            color: #64748b;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; padding: 0 !important; }
+            .container { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; background: white !important; color: black !important; }
+            th { background: #f1f5f9 !important; color: #334155 !important; border-bottom: 2px solid #cbd5e1 !important; }
+            td { border-bottom: 1px solid #e2e8f0 !important; color: black !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <span style="font-size: 12px; color: #94a3b8; margin-right: auto; font-family: monospace;">
+            Official Certified Report · AAPL (FY2023)
+        </span>
+        <button id="downloadPdfBtn" onclick="downloadAsPdf()" class="btn btn-pdf">
+            <span>📥</span>
+            <span>Download PDF Report</span>
+        </button>
+        <button onclick="window.print()" class="btn btn-print">
+            <span>🖨️</span>
+            <span>Print Certificate</span>
+        </button>
+        <button onclick="window.close()" class="btn btn-close">
+            <span>✕</span>
+            <span>Close</span>
+        </button>
+    </div>
+    <div class="container" id="reportContent">
+        <div class="header">
+            <div>
+                <h1 style="margin: 0; color: white; font-size: 24px; letter-spacing: -0.5px;">
+                    FINFORGE <span style="color: #06b6d4;">AI</span>
+                </h1>
+                <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">Autonomous SEC EDGAR Filing Audit Certificate</p>
+            </div>
+            <div style="text-align: right;">
+                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">✓ SEC XBRL VERIFIED 100%</span>
+                <div style="font-size: 11px; color: #64748b; margin-top: 6px; font-family: monospace;">Report ID: cert_fe4f57b787b1</div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px;">
+            <div style="background: #10182b; padding: 12px; border-radius: 8px;">
+                <div style="font-size: 11px; color: #64748b;">COMPANY</div>
+                <div style="font-size: 16px; font-weight: bold; color: white;">Apple Inc.</div>
+            </div>
+            <div style="background: #10182b; padding: 12px; border-radius: 8px;">
+                <div style="font-size: 11px; color: #64748b;">TICKER / CIK</div>
+                <div style="font-size: 16px; font-weight: bold; color: #38bdf8;">AAPL (0000320193)</div>
+            </div>
+            <div style="background: #10182b; padding: 12px; border-radius: 8px;">
+                <div style="font-size: 11px; color: #64748b;">PERIOD</div>
+                <div style="font-size: 16px; font-weight: bold; color: white;">FY2023</div>
+            </div>
+            <div style="background: #10182b; padding: 12px; border-radius: 8px;">
+                <div style="font-size: 11px; color: #64748b;">OVERALL ACCURACY</div>
+                <div style="font-size: 16px; font-weight: bold; color: #10b981;">100.0%</div>
+            </div>
+        </div>
+
+        <h3 style="color: white; margin-bottom: 10px; font-size: 16px;">SEC EDGAR XBRL Ground Truth Reconciliation</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Extracted</th>
+                    <th>Confidence</th>
+                    <th>Final Value</th>
+                    <th>SEC XBRL Fact</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Revenue</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$383,285.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                99.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $383,285.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$383,285.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Net Income</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$96,995.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                98.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $96,995.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$96,995.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Total Assets</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$352,583.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                97.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $352,583.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$352,583.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Total Liabilities</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$290,437.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                96.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $290,437.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$290,437.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Shareholders' Equity</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$62,146.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                96.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $62,146.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$62,146.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Operating Cash Flow</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$110,543.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                97.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $110,543.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$110,543.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Gross Profit</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$169,148.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                98.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $169,148.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$169,148.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Operating Income</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$114,301.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                98.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $114,301.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$114,301.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Cash and Cash Equivalents</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$29,965.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                98.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $29,965.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$29,965.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr><tr>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-weight: 600; color: white;">Capital Expenditures</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace;">$10,959.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8; font-weight: normal;">
+                95.0% 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #e2e8f0; font-weight: normal;">
+                $10,959.0M 
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b; font-family: monospace; color: #94a3b8;">$10,959.0M</td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block;">
+                    ✓ 100% MATCH
+                </span>
+            </td>
+        </tr>
+            </tbody>
+        </table>
+
+        <h3 style="color: white; margin-top: 30px; margin-bottom: 10px; font-size: 16px;">Human-in-the-Loop Review Audit Trail</h3>
+        <div>
+            <div style='color: #64748b;'>No manual corrections required. All metrics auto-approved with high confidence (≥85%) and balance sheet validation.</div>
+        </div>
+
+        <div class="seal">
+            <div><strong>CRYPTOGRAPHIC INTEGRITY SEAL (SHA-256):</strong></div>
+            <div style="word-break: break-all; margin-top: 4px; color: #38bdf8;">83f2a03c9a0f6fa07780364d5e4e51b84fbb8a97f2b427e83d6f2779d4118c20</div>
+            <div style="margin-top: 6px;">Generated at: 2026-11-13T04:48:12.173976+00:00 | Certified by: FinForge AI Autonomous Agent & Certified HITL Reviewer</div>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center; color: #64748b; font-size: 11px;">
+            FinForge AI Autonomous Agentic Audit Platform · Form 10-K Compliance Gateway · ISO/XBRL 2024
+        </div>
+    </div>
+
+    <script>
+        function downloadAsPdf() {
+            const btn = document.getElementById('downloadPdfBtn');
+            if (btn) btn.innerHTML = '<span>⏳</span><span>Generating PDF...</span>';
+            const element = document.getElementById('reportContent') || document.querySelector('.container') || document.body;
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: 'FinForge_Audit_Certificate_AAPL_FY2023.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#070b14' },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            if (window.html2pdf) {
+                window.html2pdf().set(opt).from(element).save().then(() => {
+                    if (btn) btn.innerHTML = '<span>✓</span><span>Downloaded PDF!</span>';
+                    setTimeout(() => { if (btn) btn.innerHTML = '<span>📥</span><span>Download PDF Report</span>'; }, 3000);
+                }).catch(err => {
+                    console.error('html2pdf error:', err);
+                    window.print();
+                });
+            } else {
+                window.print();
+            }
+        }
+    </script>
+</body>
+</html>
