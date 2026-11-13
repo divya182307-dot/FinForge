@@ -447,6 +447,32 @@ def api_download_brief():
                 logger.error("Failed to read brief PDF: %s", e)
     raise HTTPException(status_code=404, detail="FinForge Project Brief PDF not found on server")
 
+@app.get("/api/download/full-report")
+@app.get("/full-report.pdf")
+def api_download_full_report():
+    """Directly download the comprehensive FinForge Full Project Report PDF."""
+    pdf_candidates = [
+        os.path.join(REPO_ROOT, "FinForge_Full_Project_Report.pdf"),
+        os.path.join(os.path.dirname(__file__), "..", "FinForge_Full_Project_Report.pdf"),
+        os.path.join(os.getcwd(), "FinForge_Full_Project_Report.pdf"),
+    ]
+    for p in pdf_candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "rb") as f:
+                    pdf_bytes = f.read()
+                return Response(
+                    content=pdf_bytes,
+                    media_type="application/pdf",
+                    headers={
+                        "Content-Disposition": 'attachment; filename="FinForge_Full_Project_Report.pdf"',
+                        "Content-Type": "application/pdf"
+                    }
+                )
+            except Exception as e:
+                logger.error("Failed to read full report PDF: %s", e)
+    raise HTTPException(status_code=404, detail="FinForge Full Project Report PDF not found on server")
+
 @app.get("/api/download/report")
 @app.get("/report.pdf")
 def api_download_report_pdf():

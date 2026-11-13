@@ -244,6 +244,20 @@ class FinAuditRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(pdf_bytes)
                 return
 
+        # Download Full Project Report PDF
+        if path in ("/api/download/full-report", "/full-report.pdf"):
+            pdf_path = os.path.join(REPO_ROOT, "FinForge_Full_Project_Report.pdf")
+            if os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Disposition", 'attachment; filename="FinForge_Full_Project_Report.pdf"')
+                self.send_header("Content-Length", str(len(pdf_bytes)))
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+                return
+
         # Download Certified Audit Report PDF
         if path in ("/api/download/report", "/report.pdf"):
             pdf_candidates = [
