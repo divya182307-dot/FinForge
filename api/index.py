@@ -11,7 +11,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 # Ensure repository root is on sys.path
@@ -421,6 +421,32 @@ def api_reconciliation(audit_id: str):
     return get_accounting_reconciliation_workspace(audit_id)
 
 # Feature 8: Exportable Audit Report (HTML/Certificate)
+@app.get("/api/download/brief")
+@app.get("/brief.pdf")
+def api_download_brief():
+    """Directly download the compiled FinForge AI Executive Project Brief PDF."""
+    pdf_candidates = [
+        os.path.join(REPO_ROOT, "FinForge_Project_Brief.pdf"),
+        os.path.join(os.path.dirname(__file__), "..", "FinForge_Project_Brief.pdf"),
+        os.path.join(os.getcwd(), "FinForge_Project_Brief.pdf"),
+    ]
+    for p in pdf_candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "rb") as f:
+                    pdf_bytes = f.read()
+                return Response(
+                    content=pdf_bytes,
+                    media_type="application/pdf",
+                    headers={
+                        "Content-Disposition": 'attachment; filename="FinForge_Project_Brief.pdf"',
+                        "Content-Type": "application/pdf"
+                    }
+                )
+            except Exception as e:
+                logger.error("Failed to read brief PDF: %s", e)
+    raise HTTPException(status_code=404, detail="FinForge Project Brief PDF not found on server")
+
 @app.get("/api/audit/{audit_id}/report/download")
 @app.get("/api/audit/{audit_id}/report/pdf")
 @app.get("/api/audit/{audit_id}/report/html")

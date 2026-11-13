@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FinForge AI - Executive Project Brief & Technical Architecture</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      line-height: 1.5;
+      font-size: 11pt;
+      margin: 0;
+      padding: 0;
+    }
+    .header-banner {
+      background: linear-gradient(135deg, #090e17 0%, #111e38 100%);
+      color: #ffffff;
+      padding: 24px 28px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header-left h1 {
+      margin: 0 0 4px 0;
+      font-size: 22pt;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #38bdf8;
+    }
+    .header-left .subtitle {
+      font-size: 11pt;
+      color: #94a3b8;
+      margin: 0;
+    }
+    .header-badge {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid #38bdf8;
+      color: #38bdf8;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    h2 {
+      font-size: 14pt;
+      color: #0f172a;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-top: 22px;
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+    h3 {
+      font-size: 11.5pt;
+      color: #1e293b;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    p {
+      margin: 0 0 10px 0;
+      color: #334155;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+      background: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      font-size: 9.5pt;
+    }
+    .meta-item strong {
+      display: block;
+      color: #64748b;
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .meta-item span {
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .callout-box {
+      background: #f0fdf4;
+      border-left: 4px solid #10b981;
+      padding: 12px 16px;
+      margin: 14px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 10pt;
+    }
+    .callout-box.amber {
+      background: #fffbeb;
+      border-left-color: #f59e0b;
+    }
+    .callout-box.blue {
+      background: #f0f9ff;
+      border-left-color: #0284c7;
+    }
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #0f172a;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 9pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 7px 10px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+      font-weight: 700;
+      color: #334155;
+    }
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: 700;
+      font-family: monospace;
+    }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-danger { background: #fee2e2; color: #991b1b; }
+    .badge-info { background: #e0f2fe; color: #075985; }
+    .page-break {
+      page-break-before: always;
+    }
+    .pipeline-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .pipeline-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      font-size: 9pt;
+    }
+    .pipeline-card .num {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      line-height: 20px;
+      text-align: center;
+      background: #0284c7;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 8pt;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+    .pipeline-card strong {
+      color: #0f172a;
+    }
+    .pipeline-card p {
+      margin: 4px 0 0 0;
+      color: #64748b;
+      font-size: 8.5pt;
+    }
+    ul, ol {
+      margin: 0 0 10px 0;
+      padding-left: 20px;
+      color: #334155;
+    }
+    li {
+      margin-bottom: 4px;
+    }
+    .footer {
+      margin-top: 24px;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 8px;
+      font-size: 8pt;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER BANNER -->
+  <div class="header-banner">
+    <div class="header-left">
+      <h1>FinForge AI</h1>
+      <p class="subtitle">Autonomous Financial Filing Auditor & Certified Verification Engine</p>
+    </div>
+    <div>
+      <span class="header-badge">Executive Brief</span>
+    </div>
+  </div>
+
+  <!-- META INFORMATION -->
+  <div class="meta-grid">
+    <div class="meta-item">
+      <strong>Product</strong>
+      <span>FinForge AI v2.4</span>
+    </div>
+    <div class="meta-item">
+      <strong>Core Architecture</strong>
+      <span>LangGraph HITL + FastAPI</span>
+    </div>
+    <div class="meta-item">
+      <strong>Ground Truth</strong>
+      <span>SEC EDGAR XBRL Data</span>
+    </div>
+    <div class="meta-item">
+      <strong>Live Deployment</strong>
+      <span>finforge-ten.vercel.app</span>
+    </div>
+  </div>
+
+  <!-- 1. EXECUTIVE SUMMARY -->
+  <h2>1. Executive Summary & Mission Statement</h2>
+  <p>
+    <strong>FinForge AI</strong> is an enterprise financial auditing system built to address the critical risks of autonomous AI hallucination in corporate financial filings. When processing massive SEC Form 10-K disclosures, generic Large Language Models frequently misinterpret accounting line items, confuse GAAP with non-GAAP definitions, or hallucinate metrics without verifiable source groundings.
+  </p>
+  <p>
+    FinForge enforces mathematical double-entry accounting invariants, cross-checks extractions against authoritative SEC EDGAR XBRL taxonomies, and features a stateful <strong>Human-in-the-Loop (HITL)</strong> escalation gateway. When discrepancies or low-confidence metrics occur, autonomous execution pauses deterministically, allowing certified human auditors to review exact 10-K evidence excerpts and <strong>Approve</strong>, <strong>Correct</strong>, or <strong>Reject</strong> values before certified audit certificates are issued.
+  </p>
+
+  <div class="callout-box blue">
+    <div class="callout-title">Key Value Metric</div>
+    FinForge maintains strict append-only non-destructive versioning: raw autonomous extractions are <strong>never overwritten</strong>. Every auditor modification is immutably recorded in a SHA-256 tamper-evident hash ledger.
+  </div>
+
+  <!-- 2. HIGH-LEVEL TECHNICAL ARCHITECTURE -->
+  <h2>2. System Architecture & Technical Stack</h2>
+  <p>
+    The system follows a decoupled, resilient architecture designed for both high-throughput serverless cloud execution and secure on-premise local deployments:
+  </p>
+  <ul>
+    <li><strong>Frontend Application</strong>: Modern Single-Page Application (SPA) built with React 18, Tailwind CSS, JetBrains Mono typography, inline PDF certificate renderer (<code>html2pdf.js</code>), and responsive financial KPI monitors.</li>
+    <li><strong>Backend Application Layer</strong>: Python FastAPI asynchronous API service supporting all 7 Hackathon Core REST specifications alongside 12 advanced financial analytics endpoints.</li>
+    <li><strong>LangGraph Workflow Engine</strong>: 9-stage deterministic Directed Acyclic Graph (DAG) with state checkpointing, thread pausing, and reactive resumption.</li>
+    <li><strong>Data Persistence</strong>: SQLite append-only datastore tracking <code>audit_runs</code>, <code>extracted_metrics</code>, <code>review_items</code>, <code>audit_history</code>, and SHA-256 <code>audit_trail_blocks</code>.</li>
+  </ul>
+
+  <!-- 3. THE 9-STAGE AUDIT PIPELINE -->
+  <h2>3. The 9-Stage Autonomous Audit Workflow</h2>
+  <div class="pipeline-grid">
+    <div class="pipeline-card">
+      <span class="num">1</span><strong>SEC Ingestion</strong>
+      <p>Automated retrieval of Form 10-K annual reports or custom filing uploads.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">2</span><strong>Context Chunking</strong>
+      <p>Segmenting Item 8 Consolidated Balance Sheets and Footnotes.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">3</span><strong>Fact Extraction</strong>
+      <p>Targeted extraction of Assets, Liabilities, Equity, Revenue, and Income.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">4</span><strong>Invariant Verification</strong>
+      <p>Mathematical check: Total Assets = Total Liabilities + Stockholders' Equity.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">5</span><strong>Temporal Analytics</strong>
+      <p>YoY variance checks against multi-year historical company baselines.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">6</span><strong>Adaptive Scoring</strong>
+      <p>Dynamic confidence scoring (0.00 to 1.00) based on OCR & math clarity.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">7</span><strong>Escalation Gate</strong>
+      <p>Halts thread if confidence &lt; 85% or accounting invariants fail.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">8</span><strong>Human Review</strong>
+      <p>Auditor reviews evidence and issues Approve / Correct / Reject decision.</p>
+    </div>
+    <div class="pipeline-card">
+      <span class="num">9</span><strong>Reconciliation & Seal</strong>
+      <p>Workflow resumes, validates against XBRL, and issues certified PDF report.</p>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- 4. REALISTIC CASE STUDY: INTENTIONAL FINANCIAL ERROR -->
+  <h2>4. Realistic Anomaly Demonstration: NVIDIA (NVDA FY2023)</h2>
+  <p>
+    To validate FinForge under real-world filing conditions, an intentional accounting anomaly was injected into the NVIDIA Corp FY2023 Form 10-K balance sheet data:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Financial Metric</th>
+        <th>Extracted Value</th>
+        <th>SEC EDGAR Ground Truth</th>
+        <th>Variance</th>
+        <th>Confidence</th>
+        <th>System Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Total Revenue</strong></td>
+        <td>$26,974.0M</td>
+        <td>$26,974.0M</td>
+        <td>$0.0M</td>
+        <td><span class="badge badge-success">98%</span></td>
+        <td><span class="badge badge-success">Passed</span></td>
+      </tr>
+      <tr>
+        <td><strong>Net Income</strong></td>
+        <td>$4,368.0M</td>
+        <td>$4,368.0M</td>
+        <td>$0.0M</td>
+        <td><span class="badge badge-success">96%</span></td>
+        <td><span class="badge badge-success">Passed</span></td>
+      </tr>
+      <tr>
+        <td><strong>Total Liabilities</strong></td>
+        <td>$27,241.0M</td>
+        <td>$27,241.0M</td>
+        <td>$0.0M</td>
+        <td><span class="badge badge-success">95%</span></td>
+        <td><span class="badge badge-success">Passed</span></td>
+      </tr>
+      <tr>
+        <td><strong>Stockholders' Equity</strong></td>
+        <td>$13,941.0M</td>
+        <td>$13,941.0M</td>
+        <td>$0.0M</td>
+        <td><span class="badge badge-success">95%</span></td>
+        <td><span class="badge badge-success">Passed</span></td>
+      </tr>
+      <tr style="background: #fff1f2;">
+        <td><strong>Total Assets (Anomalous)</strong></td>
+        <td><strong style="color: #e11d48;">$45,182.0M</strong></td>
+        <td><strong>$41,182.0M</strong></td>
+        <td><strong style="color: #e11d48;">+$4,000.0M</strong></td>
+        <td><span class="badge badge-danger">68%</span></td>
+        <td><span class="badge badge-warning">⚠️ Flagged for Review</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout-box amber">
+    <div class="callout-title">Autonomous Error Detection Logic</div>
+    FinForge detected that $	ext{Total Liabilities (\$27,241M)} + 	ext{Equity (\$13,941M)} = \mathbf{\$41,182M}$, leaving a <strong>$4,000.0M discrepancy</strong> against the extracted Total Assets ($45,182M). The execution thread was automatically paused at the <code>human_review</code> stage.
+  </div>
+
+  <h3>Auditor Decision & Certification Resolution:</h3>
+  <ol>
+    <li>The auditor opens the <strong>Human Review Center</strong>, which highlights the $4,000.0M variance alongside the original SEC Form 10-K evidence text.</li>
+    <li>The auditor clicks <strong>Correct to $41,182.0M</strong> (or selects Custom Justification).</li>
+    <li>FinForge writes the correction to <code>audit_history</code>, marks the metric as passed, and resumes the LangGraph thread to <code>completed</code>.</li>
+    <li>The final reconciliation matrix updates to <strong>100.0% extraction accuracy</strong> with zero outstanding discrepancies.</li>
+  </ol>
+
+  <!-- 5. REST API CONTRACT SPECIFICATION -->
+  <h2>5. REST API Contract & Core Endpoints</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>Endpoint</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-info">GET</span></td>
+        <td><code>/api/companies</code></td>
+        <td>Returns supported companies and current filing audit readiness.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-success">POST</span></td>
+        <td><code>/api/audit/run</code></td>
+        <td>Initiates 9-stage audit for a given ticker and reporting period.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-success">POST</span></td>
+        <td><code>/api/audit/upload</code></td>
+        <td>Uploads and ingests custom Form 10-K filing extractions.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-info">GET</span></td>
+        <td><code>/api/audit/{id}</code></td>
+        <td>Returns detailed audit execution state, stage, and metric results.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-info">GET</span></td>
+        <td><code>/api/reviews</code></td>
+        <td>Lists all items currently paused and awaiting human review.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-success">POST</span></td>
+        <td><code>/api/reviews/{id}/decision</code></td>
+        <td>Submits auditor decision (Approve, Correct, Reject) and resumes LangGraph.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-info">GET</span></td>
+        <td><code>/api/audit/{id}/report</code></td>
+        <td>Retrieves official SEC XBRL ground truth reconciliation report.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-info">GET</span></td>
+        <td><code>/api/audit/{id}/history</code></td>
+        <td>Retrieves immutable append-only decision audit trail.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-danger">POST</span></td>
+        <td><code>/api/audit/reset</code></td>
+        <td>Clears all previous runs and reviews for a clean demonstration run.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 6. CONCLUSION & VERIFICATION -->
+  <h2>6. Conclusion & Verification Summary</h2>
+  <p>
+    FinForge AI demonstrates how autonomous AI pipelines can be safely deployed in high-stakes financial domains. By combining automated extraction speed with strict accounting invariant enforcement, cryptographic auditing, and Human-in-the-Loop decision controls, FinForge provides a trustworthy, audit-ready standard for enterprise financial analysis.
+  </p>
+
+  <div class="footer">
+    <span>FinForge AI — Certified Financial Audit Engine</span>
+    <span>Generated: November 2026 · Confidential & Proprietary</span>
+  </div>
+
+</body>
+</html>
